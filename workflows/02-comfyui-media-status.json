@@ -1,0 +1,70 @@
+{
+  "id": "media-pipeline-comfyui-02",
+  "name": "Media Pipeline 02 — ComfyUI Media Status",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "comfyui-media-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8f7f0b88-0002-4000-9000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "webhookId": "8f7f0b88-9ef7-4269-a0c6-000000000002"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nconst promptId = String(input.body?.prompt_id || input.prompt_id || input.query?.prompt_id || '').trim();\nif (!promptId) throw new Error('Missing required field: prompt_id');\nreturn [{ json: { promptId, historyUrl: `http://comfyui:8188/history/${promptId}` } }];"
+      },
+      "id": "8f7f0b88-0002-4000-9000-000000000002",
+      "name": "Prepare History Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.historyUrl }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "8f7f0b88-0002-4000-9000-000000000003",
+      "name": "Get History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "8f7f0b88-0002-4000-9000-000000000004",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Prepare History Request", "type": "main", "index": 0 }]]
+    },
+    "Prepare History Request": {
+      "main": [[{ "node": "Get History", "type": "main", "index": 0 }]]
+    },
+    "Get History": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "id": "media-pipeline-comfyui-01",
+  "name": "Media Pipeline 01 — ComfyUI Queue Media",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "comfyui-media-generate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8f7f0b88-0001-4000-9000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "webhookId": "8f7f0b88-9ef7-4269-a0c6-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json || {};\n\nconst mode = String(body.mode || 'txt2img');\nif (mode !== 'txt2img') {\n  throw new Error(`Unsupported mode: ${mode}. This workflow currently ships with txt2img; add video/audio by pasting a ComfyUI API prompt template into this node.`);\n}\n\nfunction clampInt(value, fallback, min, max) {\n  const n = Number.parseInt(value ?? fallback, 10);\n  if (!Number.isFinite(n)) return fallback;\n  return Math.min(max, Math.max(min, n));\n}\n\nfunction clampFloat(value, fallback, min, max) {\n  const n = Number.parseFloat(value ?? fallback);\n  if (!Number.isFinite(n)) return fallback;\n  return Math.min(max, Math.max(min, n));\n}\n\nconst positive = String(body.prompt || body.positive || '').trim();\nif (!positive) throw new Error('Missing required field: prompt');\n\nconst negative = String(body.negative || 'low quality, blurry, distorted, watermark, text artifacts');\nconst ckptName = String(body.ckpt_name || 'v1-5-pruned-emaonly-fp16 (2).safetensors');\nconst width = clampInt(body.width, 512, 256, 1024);\nconst height = clampInt(body.height, 512, 256, 1024);\nconst steps = clampInt(body.steps, 22, 1, 60);\nconst cfg = clampFloat(body.cfg, 7.0, 0, 20);\nconst sampler = String(body.sampler_name || 'dpmpp_2m');\nconst scheduler = String(body.scheduler || 'karras');\nconst seed = body.seed === undefined || body.seed === null || body.seed === ''\n  ? Math.floor(Math.random() * 2147483647)\n  : clampInt(body.seed, 0, 0, 2147483647);\nconst batchSize = clampInt(body.batch_size, 1, 1, 1);\nconst filenamePrefix = String(body.filename_prefix || `n8n/${mode}`);\n\nconst prompt = {\n  '1': { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: ckptName } },\n  '2': { class_type: 'CLIPTextEncode', inputs: { text: positive, clip: ['1', 1] } },\n  '3': { class_type: 'CLIPTextEncode', inputs: { text: negative, clip: ['1', 1] } },\n  '4': { class_type: 'EmptyLatentImage', inputs: { width, height, batch_size: batchSize } },\n  '5': {\n    class_type: 'KSampler',\n    inputs: {\n      seed,\n      steps,\n      cfg,\n      sampler_name: sampler,\n      scheduler,\n      denoise: 1,\n      model: ['1', 0],\n      positive: ['2', 0],\n      negative: ['3', 0],\n      latent_image: ['4', 0]\n    }\n  },\n  '6': { class_type: 'VAEDecode', inputs: { samples: ['5', 0], vae: ['1', 2] } },\n  '7': { class_type: 'SaveImage', inputs: { images: ['6', 0], filename_prefix: filenamePrefix } }\n};\n\nreturn [{\n  json: {\n    comfyuiBody: JSON.stringify({ prompt, client_id: 'n8n-comfyui-media-pipeline' }),\n    mode,\n    seed,\n    ckptName,\n    width,\n    height,\n    steps,\n    cfg,\n    sampler,\n    scheduler,\n    filenamePrefix\n  }\n}];"
+      },
+      "id": "8f7f0b88-0001-4000-9000-000000000002",
+      "name": "Build ComfyUI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://comfyui:8188/prompt",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.comfyuiBody }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "8f7f0b88-0001-4000-9000-000000000003",
+      "name": "Queue Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const queued = $input.first().json || {};\nconst meta = $('Build ComfyUI Prompt').first().json;\nconst promptId = queued.prompt_id;\n\nreturn [{ json: {\n  status: 'queued',\n  prompt_id: promptId,\n  queue_number: queued.number,\n  node_errors: queued.node_errors || {},\n  mode: meta.mode,\n  seed: meta.seed,\n  ckpt_name: meta.ckptName,\n  width: meta.width,\n  height: meta.height,\n  status_webhook: 'http://localhost:5678/webhook/comfyui-media-status',\n  status_body: { prompt_id: promptId },\n  comfyui_history_url: `http://localhost:8188/history/${promptId}`\n}}];"
+      },
+      "id": "8f7f0b88-0001-4000-9000-000000000004",
+      "name": "Build Queue Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "8f7f0b88-0001-4000-9000-000000000005",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1280, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Build ComfyUI Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build ComfyUI Prompt": {
+      "main": [[{ "node": "Queue Prompt", "type": "main", "index": 0 }]]
+    },
+    "Queue Prompt": {
+      "main": [[{ "node": "Build Queue Response", "type": "main", "index": 0 }]]
+    },
+    "Build Queue Response": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

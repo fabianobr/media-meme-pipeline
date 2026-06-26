@@ -1,0 +1,40 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Generated media and run artifacts
+data/media-pipeline/
+outputs/
+output/
+runs/
+artifacts/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.mp3
+*.m4a
+*.wav
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+.DS_Store
+
