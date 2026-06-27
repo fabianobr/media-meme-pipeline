@@ -46,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const queued = $input.first().json || {};\nconst meta = $('Build ComfyUI Prompt').first().json;\nconst promptId = queued.prompt_id;\n\nreturn [{ json: {\n  status: 'queued',\n  prompt_id: promptId,\n  queue_number: queued.number,\n  node_errors: queued.node_errors || {},\n  mode: meta.mode,\n  seed: meta.seed,\n  ckpt_name: meta.ckptName,\n  width: meta.width,\n  height: meta.height,\n  status_webhook: 'http://localhost:5678/webhook/comfyui-media-status',\n  status_body: { prompt_id: promptId },\n  comfyui_history_url: `http://localhost:8188/history/${promptId}`\n}}];"
+        "jsCode": "const queued = $input.first().json || {};\nconst meta = $('Build ComfyUI Prompt').first().json;\nconst promptId = queued.prompt_id;\n\nreturn [{ json: {\n  status: 'queued',\n  prompt_id: promptId,\n  queue_number: queued.number,\n  node_errors: queued.node_errors || {},\n  mode: meta.mode,\n  seed: meta.seed,\n  ckpt_name: meta.ckptName,\n  width: meta.width,\n  height: meta.height,\n  status_path: '/webhook/comfyui-media-status',\n  status_body: { prompt_id: promptId },\n  comfyui_history_path: `/history/${promptId}`\n}}];"
       },
       "id": "8f7f0b88-0001-4000-9000-000000000004",
       "name": "Build Queue Response",

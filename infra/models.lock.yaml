@@ -1,0 +1,47 @@
+schema_version: 1
+homelab:
+  repository: https://github.com/fabianobr/homelab-ai.git
+  tag: v1.0.0
+ollama:
+  - name: qwen3:8b
+  - name: qwen2.5vl:7b
+  - name: gemma3:12b
+comfyui:
+  models:
+    - id: ltx-2.3-checkpoint
+      repository: Lightricks/LTX-2.3-fp8
+      revision: main
+      url: https://huggingface.co/Lightricks/LTX-2.3-fp8/resolve/main/ltx-2.3-22b-dev-fp8.safetensors
+      destination: models/checkpoints/ltx-2.3-22b-dev-fp8.safetensors
+      size_bytes: 29100000000
+      sha256: 28606c5b5a06ce56f896d4dfcb20f212739e07a68fbe48e53638188449d26450
+      license: ltx-2.3-community-license
+      license_url: https://huggingface.co/Lightricks/LTX-2.3-fp8/blob/main/LICENSE
+      requires_hf_token: true
+    - id: ltx-2.3-text-encoder
+      repository: Comfy-Org/ltx-2
+      revision: 9592c0176b8d00bd93f3a566c4443fbff2153374
+      url: https://huggingface.co/Comfy-Org/ltx-2/resolve/9592c0176b8d00bd93f3a566c4443fbff2153374/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors
+      destination: models/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors
+      size_bytes: 7400000000
+      sha256: aaca463d11e6d8d2a4bdb0d6299214c15ef78a3f73e0ef8113d5a9d0219b3f6d
+      license: apache-2.0
+      license_url: https://huggingface.co/Comfy-Org/ltx-2/blob/main/LICENSE
+      requires_hf_token: false
+    - id: ltx-2.3-distilled-lora
+      repository: Lightricks/LTX-2.3
+      revision: 998921d1fd732e0e609cce933a2ebbd309399960
+      url: https://huggingface.co/Lightricks/LTX-2.3/resolve/998921d1fd732e0e609cce933a2ebbd309399960/ltx-2.3-22b-distilled-lora-384.safetensors
+      destination: models/loras/ltx-2.3-22b-distilled-lora-384.safetensors
+      size_bytes: 2300000000
+      sha256: 2943ab994f3c9d88052e5a2a34cca14e4a2dfc36b1d8c407931d52d5c25dd72b
+      license: ltx-2.3-community-license
+      license_url: https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE
+      requires_hf_token: true
+  custom_nodes:
+    - name: ComfyUI-Manager
+      repository: https://github.com/ltdrdata/ComfyUI-Manager.git
+      commit: 8da299d978fc7063282cfe2f3978cef26be2db2a
+    - name: ComfyUI-LTXVideo
+      repository: https://github.com/Lightricks/ComfyUI-LTXVideo.git
+      commit: 4f45fd6c222eb06eb3e46605da62e7c889e4be5c

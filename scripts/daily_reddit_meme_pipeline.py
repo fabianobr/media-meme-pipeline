@@ -49,10 +49,11 @@ DEFAULT_LTX_TEXT_ENCODER = "t5xxl_fp16.safetensors"
 DEFAULT_LTX23_CKPT_NAME = "ltx-2.3-22b-dev-fp8.safetensors"
 DEFAULT_LTX23_TEXT_ENCODER = "gemma_3_12B_it_fp4_mixed.safetensors"
 DEFAULT_LTX23_LORA = "ltx-2.3-22b-distilled-lora-384.safetensors"
-N8N_GENERATE_URL = "http://localhost:5678/webhook/comfyui-media-generate"
-N8N_STATUS_URL = "http://localhost:5678/webhook/comfyui-media-status"
-COMFYUI_VIEW_URL = "http://localhost:8188/view"
+N8N_URL = "http://localhost:5678"
+N8N_GENERATE_URL = f"{N8N_URL}/webhook/comfyui-media-generate"
+N8N_STATUS_URL = f"{N8N_URL}/webhook/comfyui-media-status"
 COMFYUI_URL = "http://localhost:8188"
+COMFYUI_VIEW_URL = f"{COMFYUI_URL}/view"
 OLLAMA_URL = "http://localhost:11434"
 VIDEO_FPS = 30
 MIN_LTX_VIDEO_SECONDS = 10.0
@@ -70,6 +71,18 @@ def load_env_file(path: Path) -> None:
         value = value.strip().strip('"').strip("'")
         if key and key not in os.environ:
             os.environ[key] = value
+
+
+def configure_service_urls(args: argparse.Namespace) -> None:
+    """Apply endpoint precedence: CLI, environment, then localhost defaults."""
+
+    global COMFYUI_URL, COMFYUI_VIEW_URL, N8N_URL, N8N_GENERATE_URL, N8N_STATUS_URL, OLLAMA_URL
+    OLLAMA_URL = (args.ollama_url or os.environ.get("OLLAMA_URL") or OLLAMA_URL).rstrip("/")
+    COMFYUI_URL = (args.comfyui_url or os.environ.get("COMFYUI_URL") or COMFYUI_URL).rstrip("/")
+    N8N_URL = (args.n8n_url or os.environ.get("N8N_URL") or N8N_URL).rstrip("/")
+    COMFYUI_VIEW_URL = f"{COMFYUI_URL}/view"
+    N8N_GENERATE_URL = f"{N8N_URL}/webhook/comfyui-media-generate"
+    N8N_STATUS_URL = f"{N8N_URL}/webhook/comfyui-media-status"
 
 
 def slugify(value: str, max_len: int = 64) -> str:
@@ -2484,9 +2497,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render concepts rejected by the humor critic. Disabled by default to avoid spending GPU on weak jokes.",
     )
     parser.add_argument("--no-render", action="store_true")
-    parser.add_argument("--no-telegram", action="store_true")
+    parser.add_argument("--telegram", action="store_true", help="Opt in to Telegram delivery using private environment values.")
+    parser.add_argument("--no-telegram", action="store_false", dest="telegram", default=False, help=argparse.SUPPRESS)
     parser.add_argument("--clean-output", action="store_true")
     parser.add_argument("--env-file", type=Path, default=Path.home() / ".hermes" / ".env")
+    parser.add_argument("--ollama-url", help="Ollama base URL (overrides OLLAMA_URL).")
+    parser.add_argument("--comfyui-url", help="ComfyUI base URL (overrides COMFYUI_URL).")
+    parser.add_argument("--n8n-url", help="Optional n8n base URL (overrides N8N_URL).")
     return parser
 
 
@@ -2501,6 +2518,7 @@ def main() -> int:
         )
         args.ltx_frames = min_ltx_frames
     load_env_file(args.env_file)
+    configure_service_urls(args)
 
     today = datetime.now().strftime("%Y-%m-%d")
     run_dir = args.output_root / today
@@ -2516,7 +2534,8 @@ def main() -> int:
         print("No candidates found.")
         return 1
     write_json(run_dir / "selected.json", [asdict(post) for post in posts])
-    free_comfy_memory()
+    if not args.no_render:
+        free_comfy_memory()
     source_media_paths, visual_descriptions = prepare_source_media(posts, run_dir, args)
 
     if args.skip_ollama_concepts:
@@ -2593,11 +2612,11 @@ def main() -> int:
     write_json(run_dir / "concepts.json", concepts)
     (run_dir / "summary.md").write_text(summary, encoding="utf-8")
 
-    if final_paths and not args.no_telegram:
+    if final_paths and args.telegram:
         send_telegram_album(final_paths, summary)
         print(f"Telegram sent: {len(final_paths)} images")
-    elif args.no_telegram:
-        print("--no-telegram enabled; not sending Telegram.")
+    elif not args.telegram:
+        print("Telegram disabled by default; not sending. Use --telegram to opt in.")
 
     print(f"Artifacts: {run_dir}")
     if video_paths:

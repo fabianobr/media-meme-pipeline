@@ -10,6 +10,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.cache/
 .venv/
 venv/
 
@@ -19,6 +20,8 @@ outputs/
 output/
 runs/
 artifacts/
+payloads/
+*.payload.json
 *.mp4
 *.mov
 *.mkv
@@ -37,4 +40,3 @@ artifacts/
 *.tmp
 *.bak
 .DS_Store
-
