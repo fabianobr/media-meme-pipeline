@@ -1862,7 +1862,9 @@ def validate_ltx23_prompts(prompts: list[str]) -> list[str]:
     return errors
 
 
-def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, Any]) -> list[str]:
+def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, Any], segments: int = 1) -> list[str]:
+    if segments not in (1, 2):
+        raise ValueError("ltx23 supports 1 or 2 segments per concept")
     script = concept.get("video_script")
     if should_rebuild_ltx23_video_script(script):
         script = build_video_script(post, concept)
@@ -1902,19 +1904,38 @@ def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, An
     # ("no captions, posters, subtitles") or shouting the joke in caps makes
     # the model render them; spoken lines go in as quoted lowercase voice-over.
     dialogue = str(concept.get("video_script", {}).get("dialogue") or "").strip()
-    if dialogue:
-        audio_sentence = (
-            'Audio: a calm adult Brazilian Portuguese voice-over says with dry comic timing: '
-            f'"{dialogue.lower().rstrip(".")}". Quiet indoor room tone.'
+
+    def audio_sentence(text: str) -> str:
+        if text:
+            return (
+                'Audio: a calm adult Brazilian Portuguese voice-over says with dry comic timing: '
+                f'"{text.lower().rstrip(".")}". Quiet indoor room tone.'
+            )
+        return "Audio: natural Brazilian Portuguese narration with dry comic timing. Quiet indoor room tone."
+
+    def segment_prompt(action_text: str, dialogue_text: str) -> str:
+        return (
+            f"{action_text}. {character}. {prop}. {scene}. "
+            f"Camera: {camera}. Keep natural light, sharp focus, and minimal motion. "
+            "One continuous shot. "
+            f"{audio_sentence(dialogue_text)}"
         )
+
+    if segments == 1:
+        prompts = (segment_prompt(actions[0], dialogue),)
     else:
-        audio_sentence = "Audio: natural Brazilian Portuguese narration with dry comic timing. Quiet indoor room tone."
-    prompts = (
-        f"{actions[0]}. {character}. {prop}. {scene}. "
-        f"Camera: {camera}. Keep natural light, sharp focus, and minimal motion. "
-        "One continuous shot. "
-        f"{audio_sentence}",
-    )
+        # Segment 2 anchors on the last frame of segment 1 and carries the
+        # punchline: the final sentence of the dialogue stays in segment 2,
+        # everything before it in segment 1.
+        sentences = [chunk.strip() for chunk in re.split(r"(?<=[.!?])\s+", dialogue) if chunk.strip()]
+        if len(sentences) >= 2:
+            dialogue_head, dialogue_tail = " ".join(sentences[:-1]), sentences[-1]
+        else:
+            dialogue_head, dialogue_tail = "", dialogue
+        prompts = (
+            segment_prompt(f"{actions[0]}, then {actions[1]}", dialogue_head),
+            segment_prompt(actions[2], dialogue_tail),
+        )
     concept["ltx23_prompt_contract"] = {
         "style": "literal-chronological-cinematography",
         "semantic_labels_sent_to_model": False,
@@ -2915,7 +2936,10 @@ def render_ltx_video_meme(
     seed = int(concept.get("seed") or int(time.time() * 1000) % 2_000_000_000)
     if args.video_engine == "ltx23":
         frames = ltx_valid_frame_count(args.ltx23_frames)
-        prompt = compose_ltx23_segment_prompts(post, concept)[0]
+        segment_count = args.ltx23_segments
+        if segment_count > 1 and args.ltx23_input_mode == "prompt":
+            raise RuntimeError("ltx23 multi-segment rendering requires an image input mode")
+        prompts = compose_ltx23_segment_prompts(post, concept, segments=segment_count)
         reference_path: Path | None = None
         if args.ltx23_input_mode == "image":
             if final_image_path is None:
@@ -2929,43 +2953,64 @@ def render_ltx_video_meme(
                 raise RuntimeError(f"ltx23 source reference image not found: {source_reference}")
             reference_path = source_reference
         print(
-            f"  LTX 2.3 native A/V validation: {frames} frames "
+            f"  LTX 2.3 native A/V validation: {segment_count} segment(s) x {frames} frames "
             f"({'I2V' if reference_path else 'T2V'})"
         )
-        prompt_id = queue_comfy_ltx23_native_video(
-            concept,
-            post,
-            prefix,
-            seed,
-            args,
-            video_prompt_override=prompt,
-            frames_override=frames,
-            reference_image_path=reference_path,
-        )
-        ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
-        download_comfy_file(ref, output_path)
-        concept["video_prompt_id"] = prompt_id
-        concept["video_duration_seconds"] = frames / args.ltx23_fps
+        segment_paths: list[Path] = []
+        segment_records: list[dict[str, Any]] = []
+        current_reference = reference_path
+        for segment_index, segment_prompt_text in enumerate(prompts, 1):
+            if segment_count == 1:
+                segment_prefix, segment_output = prefix, output_path
+            else:
+                segment_prefix = f"{prefix}-segment-{segment_index}"
+                segment_output = output_path.with_name(f"{output_path.stem}-segment-{segment_index}.mp4")
+            segment_seed = seed + segment_index - 1
+            prompt_id = queue_comfy_ltx23_native_video(
+                concept,
+                post,
+                segment_prefix,
+                segment_seed,
+                args,
+                video_prompt_override=segment_prompt_text,
+                frames_override=frames,
+                reference_image_path=current_reference,
+            )
+            ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
+            download_comfy_file(ref, segment_output)
+            segment_paths.append(segment_output)
+            segment_records.append(
+                {
+                    "segment": segment_index,
+                    "prompt_id": prompt_id,
+                    "prompt": segment_prompt_text,
+                    "negative_prompt": ltx23_negative_prompt(),
+                    "seed": segment_seed,
+                    "frames": frames,
+                    "fps": args.ltx23_fps,
+                    "width": args.ltx23_width,
+                    "height": args.ltx23_height,
+                    "sampling_steps": None if current_reference else args.ltx23_steps,
+                    "sampling_profile": (
+                        "official-template-distilled-base8-refine3"
+                        if current_reference
+                        else "validated-native-av-workflow"
+                    ),
+                    "input_mode": "image-to-video" if current_reference else "text-to-video",
+                    "reference_image_path": str(current_reference) if current_reference else None,
+                }
+            )
+            concept["video_prompt_id"] = prompt_id
+            if segment_index < segment_count:
+                continuation_path = output_path.with_name(
+                    f"{output_path.stem}-segment-{segment_index}-continuation.png"
+                )
+                current_reference = extract_ltx_continuation_frame(segment_output, continuation_path, 0)
+        if segment_count > 1:
+            concatenate_video_segments(segment_paths, output_path)
+        concept["video_duration_seconds"] = segment_count * frames / args.ltx23_fps
         concept["native_audio"] = True
-        concept["ltx23_segments"] = [
-            {
-                "segment": 1,
-                "prompt_id": prompt_id,
-                "prompt": prompt,
-                "negative_prompt": ltx23_negative_prompt(),
-                "seed": seed,
-                "frames": frames,
-                "fps": args.ltx23_fps,
-                "width": args.ltx23_width,
-                "height": args.ltx23_height,
-                "sampling_steps": None if reference_path else args.ltx23_steps,
-                "sampling_profile": (
-                    "official-template-distilled-base8-refine3" if reference_path else "validated-native-av-workflow"
-                ),
-                "input_mode": "image-to-video" if reference_path else "text-to-video",
-                "reference_image_path": str(reference_path) if reference_path else None,
-            }
-        ]
+        concept["ltx23_segments"] = segment_records
         return output_path
     if args.ltx_input_mode == "image":
         if final_image_path is None:
@@ -3540,6 +3585,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ltx23-width", type=int, default=1280)
     parser.add_argument("--ltx23-height", type=int, default=720)
     parser.add_argument("--ltx23-frames", type=int, default=49)
+    parser.add_argument("--ltx23-segments", type=int, choices=(1, 2), default=1)
     parser.add_argument("--ltx23-fps", type=float, default=25.0)
     parser.add_argument("--ltx23-steps", type=int, default=8)
     parser.add_argument("--ltx23-audio-cfg", type=float, default=7.0)

@@ -76,6 +76,22 @@ Observações:
 Teto prático em 16 GB VRAM + 29 GB RAM: **~201 frames (8 s) @ 768×448** ou
 **129 frames (5 s) @ 1024×576** numa tacada só.
 
+## Extensão por segmentos (`--ltx23-segments 2`)
+
+Para passar do teto de uma tacada só, o pipeline renderiza o grafo 05 duas vezes:
+segmento 2 é ancorado no último frame do segmento 1 (`extract_ltx_continuation_frame`)
+e os MP4s são concatenados sem re-encode. A fala divide na última sentença — punchline
+fica no segmento 2, casando com a estrutura setup/escalação/punchline.
+
+Alternativas descartadas: `LTXVLoopingSampler` exige `STGGuiderAdvanced` (incompatível com
+o regime distilled CFG 1.0 validado) e nenhum exemplo oficial 2.3 usa os samplers de
+extensão com áudio nativo.
+
+Resultado Gerald 2×129 frames @ 1024×576 (10,34 s): emenda em ~5,2 s quase invisível
+(frames adjacentes praticamente idênticos), sem pseudo-texto, identidade estável até o fim.
+Áudio contínuo com fala nos dois segmentos (pico −7,6 dB). Timbre de voz pode variar entre
+segmentos — avaliar em revisão humana.
+
 Além do teto de VRAM no refine, existe um teto de **RAM do host** para frames longos.
 Para >8 s numa tacada só, o caminho é extensão por segmentos (`LTXVExtendSampler`),
 não frame count maior.

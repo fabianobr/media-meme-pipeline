@@ -551,6 +551,30 @@ class ComfyWorkflowTests(unittest.TestCase):
         for banned in ("No cuts", "captions", "subtitles", "posters", "no visible text"):
             self.assertNotIn(banned, prompts[0])
 
+    def test_two_segment_prompts_split_punchline_into_second_segment(self) -> None:
+        concept = {
+            "video_script": {
+                "timeline": [
+                    "The cat stares at the camera",
+                    "The cat blinks once and shifts slightly",
+                    "The cat pauses and gives a tiny nod",
+                ],
+                "scene": "A simple living room", "character": "One calm house cat",
+                "main_prop": "One cat", "camera": "locked medium shot",
+                "audio": "Quiet room tone", "visual_rules": "Preserve the source scene",
+                "dialogue": "GERALD NÃO É NOME DE GATO. É NOME DE QUEM TE ENCARA ASSIM. ANTES DE NEGAR SEU EMPRÉSTIMO.",
+            },
+        }
+        prompts = pipeline.compose_ltx23_segment_prompts(self.post, concept, segments=2)
+        self.assertEqual(len(prompts), 2)
+        self.assertIn('"gerald não é nome de gato. é nome de quem te encara assim"', prompts[0])
+        self.assertNotIn("empréstimo", prompts[0])
+        self.assertIn('"antes de negar seu empréstimo"', prompts[1])
+        self.assertNotIn("gerald", prompts[1])
+        self.assertIn("pauses", prompts[1])
+        with self.assertRaises(ValueError):
+            pipeline.compose_ltx23_segment_prompts(self.post, concept, segments=3)
+
 
 if __name__ == "__main__":
     unittest.main()
