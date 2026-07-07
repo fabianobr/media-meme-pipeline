@@ -1,0 +1,52 @@
+[
+  {
+    "post_id": "t3_1uefp05",
+    "candidates": [
+      {
+        "id": 1,
+        "mechanic": "contraste",
+        "setup": "TRAJETO: QUATRO QUARTEIRÕES",
+        "escalation": "CAPACETE FECHADO, POSTURA DE LARGADA",
+        "punchline": "O DAKAR DA CICLOVIA",
+        "comic_turn": "O equipamento profissional transforma um trajeto urbano curto em competição internacional.",
+        "scene_payoff": "pessoa de capacete de motocross parada com scooter urbana no semáforo"
+      },
+      {
+        "id": 2,
+        "mechanic": "inversao",
+        "setup": "A SCOOTER FAZ VINTE E CINCO",
+        "escalation": "ELE VEIO PRONTO PARA O IMPACTO",
+        "punchline": "DA OPINIÃO DOS OUTROS",
+        "comic_turn": "O capacete deixa de proteger da velocidade e passa a proteger do julgamento público.",
+        "scene_payoff": "capacete fechado esconde a reação enquanto a scooter aguarda no sinal"
+      },
+      {
+        "id": 3,
+        "mechanic": "observacao especifica",
+        "setup": "CAPACETE DE MOTOCROSS",
+        "escalation": "SCOOTER DE ALUGUEL NO SEMÁFORO",
+        "punchline": "SEGURANÇA DEZ, CILINDRADA ZERO",
+        "comic_turn": "A desproporção entre proteção e veículo vira uma ficha técnica invertida.",
+        "scene_payoff": "capacete robusto contrasta diretamente com a pequena scooter urbana"
+      },
+      {
+        "id": 4,
+        "mechanic": "expectativa versus realidade",
+        "setup": "O GPS DISSE: SIGA RETO",
+        "escalation": "MAS O CAPACETE OUVIU RALI",
+        "punchline": "PRÓXIMA ETAPA: PADARIA",
+        "comic_turn": "Uma instrução urbana banal é interpretada como largada de uma prova extrema.",
+        "scene_payoff": "piloto equipado espera o sinal abrir para seguir pela rua comum"
+      },
+      {
+        "id": 5,
+        "mechanic": "inversao",
+        "setup": "ELE NÃO EXAGEROU NO CAPACETE",
+        "escalation": "A SCOOTER SUBESTIMOU O TRAJETO",
+        "punchline": "FALTOU MOTOR PARA A ARMADURA",
+        "comic_turn": "A culpa pela desproporção passa do piloto equipado para o veículo pequeno.",
+        "scene_payoff": "capacete de competição domina visualmente a scooter urbana pequena"
+      }
+    ]
+  }
+]

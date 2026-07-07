@@ -1,0 +1,52 @@
+[
+  {
+    "post_id": "t3_1uefhrj",
+    "candidates": [
+      {
+        "id": 1,
+        "mechanic": "inversao",
+        "setup": "MEU GATO SE CHAMA GERALD",
+        "escalation": "ELE ME ENCARA DO MEU TRAVESSEIRO",
+        "punchline": "EU MORO NA CASA DELE",
+        "comic_turn": "O nome formal e a postura séria invertem quem parece ser o dono da casa.",
+        "scene_payoff": "Gerald laranja ocupa o travesseiro e encara diretamente a câmera"
+      },
+      {
+        "id": 2,
+        "mechanic": "observacao especifica",
+        "setup": "NOME: GERALD",
+        "escalation": "PROFISSÃO: JULGAR MINHAS ESCOLHAS",
+        "punchline": "EXPERIÊNCIA: NOVE VIDAS",
+        "comic_turn": "O nome humano transforma a expressão desconfiada do gato em currículo profissional.",
+        "scene_payoff": "olhar sério de Gerald funciona como retrato profissional sobre o travesseiro"
+      },
+      {
+        "id": 3,
+        "mechanic": "escalada",
+        "setup": "CHAMEI O GATO DE GERALD",
+        "escalation": "AGORA ELE SENTA DESSE JEITO",
+        "punchline": "E PEDE PARA FALAR COM MEU GERENTE",
+        "comic_turn": "O nome formal evolui para a postura exigente de um cliente que reclama do atendimento.",
+        "scene_payoff": "Gerald mantém expressão séria e postura imóvel diante da câmera"
+      },
+      {
+        "id": 4,
+        "mechanic": "contraste",
+        "setup": "GERALD NÃO É NOME DE GATO",
+        "escalation": "É NOME DE QUEM TE ENCARA ASSIM",
+        "punchline": "ANTES DE NEGAR SEU EMPRÉSTIMO",
+        "comic_turn": "A fofura do gato contrasta com a autoridade burocrática sugerida pelo nome e olhar.",
+        "scene_payoff": "Gerald encara a câmera como alguém avaliando silenciosamente um pedido"
+      },
+      {
+        "id": 5,
+        "mechanic": "expectativa versus realidade",
+        "setup": "ADOTEI UM GATO LARANJA",
+        "escalation": "BATIZEI DE GERALD",
+        "punchline": "VEIO COM EXPERIÊNCIA EM COBRANÇA",
+        "comic_turn": "A adoção de um animal fofo termina na chegada imaginária de um cobrador veterano.",
+        "scene_payoff": "expressão desconfiada de Gerald sustenta a aparência de cobrador experiente"
+      }
+    ]
+  }
+]

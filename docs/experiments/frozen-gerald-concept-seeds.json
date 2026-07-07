@@ -1,0 +1,52 @@
+[
+  {
+    "post_id": "t3_1uefhrj",
+    "candidates": [
+      {
+        "id": 1,
+        "mechanic": "contraste",
+        "setup": "CHAMEI O GATO DE GERALD",
+        "escalation": "AGORA ELE ME ENCARA DO TRAVESSEIRO",
+        "punchline": "COMO SE EU DEVESSE TRÊS ALUGUÉIS",
+        "comic_turn": "O nome formal transforma o olhar sério do gato em cobrança de proprietário.",
+        "scene_payoff": "Gerald laranja encara a câmera com seriedade sobre o travesseiro"
+      },
+      {
+        "id": 2,
+        "mechanic": "observacao especifica",
+        "setup": "ESTE É O GERALD",
+        "escalation": "NOME DE SENHOR, CARA DE COBRANÇA",
+        "punchline": "O SACHÊ VENCE TODO DIA CINCO",
+        "comic_turn": "A expressão severa converte a rotina do sachê em um boleto administrado pelo gato.",
+        "scene_payoff": "gato laranja sério no travesseiro esperando o sachê"
+      },
+      {
+        "id": 3,
+        "mechanic": "inversao",
+        "setup": "GERALD NÃO MIA",
+        "escalation": "ELE ESPERA VOCÊ TERMINAR A EXPLICAÇÃO",
+        "punchline": "DEPOIS REPROVA EM SILÊNCIO",
+        "comic_turn": "O comportamento comum do gato vira a avaliação silenciosa de um adulto formal.",
+        "scene_payoff": "Gerald mantém o olhar desconfiado diretamente para a câmera"
+      },
+      {
+        "id": 4,
+        "mechanic": "escalada",
+        "setup": "DERAM NOME DE HUMANO AO GATO",
+        "escalation": "ELE LEVOU O CARGO A SÉRIO",
+        "punchline": "AGORA APROVA OS SACHÊS",
+        "comic_turn": "O nome humano deixa de ser apelido e passa a funcionar como cargo doméstico.",
+        "scene_payoff": "Gerald sério supervisiona o ambiente a partir do travesseiro"
+      },
+      {
+        "id": 5,
+        "mechanic": "inversao",
+        "setup": "A CASA TEM UM GATO",
+        "escalation": "MAS GERALD TEM NOME E POSTURA",
+        "punchline": "O IMÓVEL É DELE",
+        "comic_turn": "A formalidade do nome inverte a posse e transforma o gato no verdadeiro proprietário.",
+        "scene_payoff": "Gerald ocupa o travesseiro e encara a câmera como dono da casa"
+      }
+    ]
+  }
+]

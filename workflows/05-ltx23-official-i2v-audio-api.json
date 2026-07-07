@@ -1,0 +1,302 @@
+{
+  "description": "LTX 2.3 native image-to-video with audio, converted from the official ComfyUI template video_ltx2_3_i2v (comfyui-workflow-templates 0.9.94). Distilled regime: CFG 1.0, euler, manual distilled sigmas, half-resolution base pass, x2 latent spatial upsample, 3-step refine. The optional Gemma prompt enhancer from the template is intentionally omitted; the pipeline compiles literal prompts itself.",
+  "source": "ComfyUI official template video_ltx2_3_i2v; subgraph 'Image to Video (LTX-2.3)' flattened to API format. ResizeImageMaskNode (v3 dynamic node) replaced by core ImageScale with center crop.",
+  "inputs": {
+    "image": "example.png",
+    "prompt": "A realistic short video based on the reference image. The subject makes one small readable reaction while the camera stays stable.",
+    "negative": "pc game, console game, video game, cartoon, childish, ugly",
+    "seed": 202807000,
+    "width": 1280,
+    "height": 720,
+    "fps": 25,
+    "frames": 126
+  },
+  "models": {
+    "checkpoint": "ltx-2.3-22b-dev-fp8.safetensors",
+    "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+    "lora": "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors",
+    "latent_upscaler": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+  },
+  "notes": {
+    "resolution_contract": "width/height are the final output size. The base pass runs at width/2 x height/2 (node 12); the refine pass runs at full size after the x2 latent upsample (node 23). frames = fps * seconds + 1. Audio latent frames_number (node 14) must equal frames.",
+    "guidance_contract": "Both passes use CFGGuider with cfg 1.0 (distilled regime). Do not raise cfg or add STG/perturbed attention with the distilled LoRA; that regime mismatch produced pseudo-text and drift in the retired hand-built graph 04.",
+    "sigma_contract": "Base sigmas (node 19) and refine sigmas (node 30) are the official distilled schedules. Do not replace them with LTXVScheduler."
+  },
+  "prompt": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": ["1", 0],
+        "lora_name": "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors",
+        "strength_model": 0.5
+      }
+    },
+    "3": {
+      "class_type": "LTXAVTextEncoderLoader",
+      "inputs": {
+        "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors",
+        "device": "cpu"
+      }
+    },
+    "4": {
+      "class_type": "LTXVAudioVAELoader",
+      "inputs": {
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "A realistic short video based on the reference image. The subject makes one small readable reaction while the camera stays stable.",
+        "clip": ["3", 0]
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "pc game, console game, video game, cartoon, childish, ugly",
+        "clip": ["3", 0]
+      }
+    },
+    "7": {
+      "class_type": "LTXVConditioning",
+      "inputs": {
+        "positive": ["5", 0],
+        "negative": ["6", 0],
+        "frame_rate": 25.0
+      }
+    },
+    "8": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "example.png"
+      }
+    },
+    "9": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": ["8", 0],
+        "upscale_method": "lanczos",
+        "width": 1280,
+        "height": 720,
+        "crop": "center"
+      }
+    },
+    "10": {
+      "class_type": "ResizeImagesByLongerEdge",
+      "inputs": {
+        "images": ["9", 0],
+        "longer_edge": 1536
+      }
+    },
+    "11": {
+      "class_type": "LTXVPreprocess",
+      "inputs": {
+        "image": ["10", 0],
+        "img_compression": 18
+      }
+    },
+    "12": {
+      "class_type": "EmptyLTXVLatentVideo",
+      "inputs": {
+        "width": 640,
+        "height": 360,
+        "length": 126,
+        "batch_size": 1
+      }
+    },
+    "13": {
+      "class_type": "LTXVImgToVideoInplace",
+      "inputs": {
+        "vae": ["1", 2],
+        "image": ["11", 0],
+        "latent": ["12", 0],
+        "strength": 0.7,
+        "bypass": false
+      }
+    },
+    "14": {
+      "class_type": "LTXVEmptyLatentAudio",
+      "inputs": {
+        "frames_number": 126,
+        "frame_rate": 25,
+        "batch_size": 1,
+        "audio_vae": ["4", 0]
+      }
+    },
+    "15": {
+      "class_type": "LTXVConcatAVLatent",
+      "inputs": {
+        "video_latent": ["13", 0],
+        "audio_latent": ["14", 0]
+      }
+    },
+    "16": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 202807000
+      }
+    },
+    "17": {
+      "class_type": "CFGGuider",
+      "inputs": {
+        "model": ["2", 0],
+        "positive": ["7", 0],
+        "negative": ["7", 1],
+        "cfg": 1.0
+      }
+    },
+    "18": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "19": {
+      "class_type": "ManualSigmas",
+      "inputs": {
+        "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+      }
+    },
+    "20": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": ["16", 0],
+        "guider": ["17", 0],
+        "sampler": ["18", 0],
+        "sigmas": ["19", 0],
+        "latent_image": ["15", 0]
+      }
+    },
+    "21": {
+      "class_type": "LTXVSeparateAVLatent",
+      "inputs": {
+        "av_latent": ["20", 0]
+      }
+    },
+    "22": {
+      "class_type": "LatentUpscaleModelLoader",
+      "inputs": {
+        "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+      }
+    },
+    "23": {
+      "class_type": "LTXVLatentUpsampler",
+      "inputs": {
+        "samples": ["21", 0],
+        "upscale_model": ["22", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "24": {
+      "class_type": "LTXVImgToVideoInplace",
+      "inputs": {
+        "vae": ["1", 2],
+        "image": ["11", 0],
+        "latent": ["23", 0],
+        "strength": 1.0,
+        "bypass": false
+      }
+    },
+    "25": {
+      "class_type": "LTXVConcatAVLatent",
+      "inputs": {
+        "video_latent": ["24", 0],
+        "audio_latent": ["21", 1]
+      }
+    },
+    "26": {
+      "class_type": "LTXVCropGuides",
+      "inputs": {
+        "positive": ["7", 0],
+        "negative": ["7", 1],
+        "latent": ["21", 0]
+      }
+    },
+    "27": {
+      "class_type": "CFGGuider",
+      "inputs": {
+        "model": ["2", 0],
+        "positive": ["26", 0],
+        "negative": ["26", 1],
+        "cfg": 1.0
+      }
+    },
+    "28": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 42
+      }
+    },
+    "29": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "30": {
+      "class_type": "ManualSigmas",
+      "inputs": {
+        "sigmas": "0.85, 0.7250, 0.4219, 0.0"
+      }
+    },
+    "31": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": ["28", 0],
+        "guider": ["27", 0],
+        "sampler": ["29", 0],
+        "sigmas": ["30", 0],
+        "latent_image": ["25", 0]
+      }
+    },
+    "32": {
+      "class_type": "LTXVSeparateAVLatent",
+      "inputs": {
+        "av_latent": ["31", 0]
+      }
+    },
+    "33": {
+      "class_type": "VAEDecodeTiled",
+      "inputs": {
+        "samples": ["32", 0],
+        "vae": ["1", 2],
+        "tile_size": 768,
+        "overlap": 64,
+        "temporal_size": 4096,
+        "temporal_overlap": 4
+      }
+    },
+    "34": {
+      "class_type": "LTXVAudioVAEDecode",
+      "inputs": {
+        "samples": ["32", 1],
+        "audio_vae": ["4", 0]
+      }
+    },
+    "35": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": ["33", 0],
+        "fps": 25.0,
+        "audio": ["34", 0]
+      }
+    },
+    "36": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": ["35", 0],
+        "filename_prefix": "ltx23-official-i2v/smoke",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    }
+  }
+}

@@ -28,16 +28,26 @@ comfyui:
       license: apache-2.0
       license_url: https://huggingface.co/Comfy-Org/ltx-2/blob/main/LICENSE
       requires_hf_token: false
-    - id: ltx-2.3-distilled-lora
-      repository: Lightricks/LTX-2.3
-      revision: 998921d1fd732e0e609cce933a2ebbd309399960
-      url: https://huggingface.co/Lightricks/LTX-2.3/resolve/998921d1fd732e0e609cce933a2ebbd309399960/ltx-2.3-22b-distilled-lora-384.safetensors
-      destination: models/loras/ltx-2.3-22b-distilled-lora-384.safetensors
-      size_bytes: 2300000000
-      sha256: 2943ab994f3c9d88052e5a2a34cca14e4a2dfc36b1d8c407931d52d5c25dd72b
+    - id: ltx-2.3-distilled-lora-dynamic
+      repository: Comfy-Org/ltx-2.3
+      revision: e14c0e7f46a1d68384214a3c6e6b309a382016dd
+      url: https://huggingface.co/Comfy-Org/ltx-2.3/resolve/e14c0e7f46a1d68384214a3c6e6b309a382016dd/split_files/loras/ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors
+      destination: models/loras/ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors
+      size_bytes: 2741024390
+      sha256: 31e0c0195fb841bf31af78e8b60858f489e87ddcea4a5239abc80943da65e3ac
       license: ltx-2.3-community-license
       license_url: https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE
-      requires_hf_token: true
+      requires_hf_token: false
+    - id: ltx-2.3-spatial-upscaler-x2
+      repository: Lightricks/LTX-2.3
+      revision: 76730e634e70a28f4e8d51f5e29c08e40e2d8e74
+      url: https://huggingface.co/Lightricks/LTX-2.3/resolve/76730e634e70a28f4e8d51f5e29c08e40e2d8e74/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+      destination: models/latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+      size_bytes: 995743560
+      sha256: 5f416311fa8172b65af67530758964708d29a317b830d689a51143b7f91913ed
+      license: ltx-2.3-community-license
+      license_url: https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE
+      requires_hf_token: false
   custom_nodes:
     - name: ComfyUI-Manager
       repository: https://github.com/ltdrdata/ComfyUI-Manager.git

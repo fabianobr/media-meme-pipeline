@@ -1,0 +1,321 @@
+{
+  "description": "LTX 2.3 native image-to-video with audio. ComfyUI API prompt; image reference anchors composition, no external TTS.",
+  "source": "Derived from workflows/03-ltx23-native-t2v-audio-api.json plus I2V nodes present in workflows/03-ltx23-native-t2v-audio-frontend.json.",
+  "inputs": {
+    "image": "example.png",
+    "prompt": "A realistic short Brazilian internet comedy video based on the reference image. Preserve the exact main subject, camera angle, colors, lighting, and simple background from the reference. The subject makes one small readable reaction while the camera stays stable. Natural Brazilian Portuguese narrator says one short dry joke in audio only. No text, no logos, no subtitles.",
+    "negative": "pc game, console game, video game, cartoon, childish, ugly, subtitles, captions, text-like marks, letters, glyphs, typography, readable text, logos, brands, watermark, product packaging, signs, posters, labels, distorted face, malformed hands, flicker, morphing, abstract clouds, colorful smoke, scene change",
+    "seed": 202804000
+  },
+  "models": {
+    "checkpoint": "ltx-2.3-22b-dev-fp8.safetensors",
+    "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+    "lora": "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors"
+  },
+  "prompt": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "lora_name": "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors",
+        "strength_model": 0.5
+      }
+    },
+    "3": {
+      "class_type": "LTXAVTextEncoderLoader",
+      "inputs": {
+        "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors",
+        "device": "cpu"
+      }
+    },
+    "4": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "3",
+          0
+        ],
+        "text": "A realistic short Brazilian internet comedy video based on the reference image. Preserve the exact main subject, camera angle, colors, lighting, and simple background from the reference. The subject makes one small readable reaction while the camera stays stable. Natural Brazilian Portuguese narrator says one short dry joke in audio only. No text, no logos, no subtitles."
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "3",
+          0
+        ],
+        "text": "pc game, console game, video game, cartoon, childish, ugly, subtitles, captions, text-like marks, letters, glyphs, typography, readable text, logos, brands, watermark, product packaging, signs, posters, labels, distorted face, malformed hands, flicker, morphing, abstract clouds, colorful smoke, scene change"
+      }
+    },
+    "6": {
+      "class_type": "LTXVConditioning",
+      "inputs": {
+        "positive": [
+          "4",
+          0
+        ],
+        "negative": [
+          "5",
+          0
+        ],
+        "frame_rate": 24.0
+      }
+    },
+    "7": {
+      "class_type": "EmptyLTXVLatentVideo",
+      "inputs": {
+        "width": 384,
+        "height": 224,
+        "length": 49,
+        "batch_size": 1
+      }
+    },
+    "8": {
+      "class_type": "LTXVAudioVAELoader",
+      "inputs": {
+        "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
+      }
+    },
+    "9": {
+      "class_type": "LTXVEmptyLatentAudio",
+      "inputs": {
+        "frames_number": 49,
+        "frame_rate": 24,
+        "batch_size": 1,
+        "audio_vae": [
+          "8",
+          0
+        ]
+      }
+    },
+    "10": {
+      "class_type": "LTXVConcatAVLatent",
+      "inputs": {
+        "video_latent": [
+          "25",
+          0
+        ],
+        "audio_latent": [
+          "9",
+          0
+        ]
+      }
+    },
+    "11": {
+      "class_type": "GuiderParameters",
+      "inputs": {
+        "modality": "AUDIO",
+        "cfg": 7.0,
+        "stg": 1.0,
+        "perturb_attn": true,
+        "rescale": 0.7,
+        "modality_scale": 3.0,
+        "skip_step": 0,
+        "cross_attn": true
+      }
+    },
+    "12": {
+      "class_type": "GuiderParameters",
+      "inputs": {
+        "parameters": [
+          "11",
+          0
+        ],
+        "modality": "VIDEO",
+        "cfg": 3.0,
+        "stg": 1.0,
+        "perturb_attn": true,
+        "rescale": 0.9,
+        "modality_scale": 3.0,
+        "skip_step": 0,
+        "cross_attn": true
+      }
+    },
+    "13": {
+      "class_type": "MultimodalGuider",
+      "inputs": {
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "6",
+          1
+        ],
+        "parameters": [
+          "12",
+          0
+        ],
+        "skip_blocks": "28"
+      }
+    },
+    "14": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler_cfg_pp"
+      }
+    },
+    "15": {
+      "class_type": "LTXVScheduler",
+      "inputs": {
+        "steps": 8,
+        "max_shift": 2.05,
+        "base_shift": 0.95,
+        "stretch": true,
+        "terminal": 0.1,
+        "latent": [
+          "10",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 202804000
+      }
+    },
+    "17": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "16",
+          0
+        ],
+        "guider": [
+          "13",
+          0
+        ],
+        "sampler": [
+          "14",
+          0
+        ],
+        "sigmas": [
+          "15",
+          0
+        ],
+        "latent_image": [
+          "10",
+          0
+        ]
+      }
+    },
+    "18": {
+      "class_type": "LTXVSeparateAVLatent",
+      "inputs": {
+        "av_latent": [
+          "17",
+          0
+        ]
+      }
+    },
+    "19": {
+      "class_type": "LTXVTiledVAEDecode",
+      "inputs": {
+        "vae": [
+          "1",
+          2
+        ],
+        "latents": [
+          "18",
+          0
+        ],
+        "horizontal_tiles": 2,
+        "vertical_tiles": 2,
+        "overlap": 6,
+        "last_frame_fix": false,
+        "working_device": "auto",
+        "working_dtype": "auto"
+      }
+    },
+    "20": {
+      "class_type": "LTXVAudioVAEDecode",
+      "inputs": {
+        "samples": [
+          "18",
+          1
+        ],
+        "audio_vae": [
+          "8",
+          0
+        ]
+      }
+    },
+    "21": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "19",
+          0
+        ],
+        "audio": [
+          "20",
+          0
+        ],
+        "fps": 24.0
+      }
+    },
+    "22": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "21",
+          0
+        ],
+        "filename_prefix": "ltx23-i2v-audio-test/2026-06-29/reference-native-av",
+        "format": "mp4",
+        "codec": "h264"
+      }
+    },
+    "23": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "example.png"
+      }
+    },
+    "24": {
+      "class_type": "LTXVPreprocess",
+      "inputs": {
+        "image": [
+          "23",
+          0
+        ],
+        "img_compression": 18
+      }
+    },
+    "25": {
+      "class_type": "LTXVImgToVideoConditionOnly",
+      "inputs": {
+        "vae": [
+          "1",
+          2
+        ],
+        "image": [
+          "24",
+          0
+        ],
+        "latent": [
+          "7",
+          0
+        ],
+        "strength": 0.92,
+        "bypass": false
+      }
+    }
+  }
+}

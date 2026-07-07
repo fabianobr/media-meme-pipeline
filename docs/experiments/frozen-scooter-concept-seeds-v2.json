@@ -1,0 +1,52 @@
+[
+  {
+    "post_id": "t3_1uefp05",
+    "candidates": [
+      {
+        "id": 1,
+        "mechanic": "contraste",
+        "setup": "SAIU EQUIPADO PARA O DAKAR",
+        "escalation": "A SCOOTER PAROU NO PRIMEIRO SINAL",
+        "punchline": "ERA SÓ BUSCAR O PÃO",
+        "comic_turn": "A preparação para uma prova extrema termina em uma tarefa curta e cotidiana.",
+        "scene_payoff": "piloto com capacete de motocross espera o semáforo sobre scooter urbana"
+      },
+      {
+        "id": 2,
+        "mechanic": "inversao",
+        "setup": "PROTEÇÃO PARA CENTO E VINTE",
+        "escalation": "SCOOTER LIMITADA A VINTE E CINCO",
+        "punchline": "O TOMBO É NA AUTOESTIMA",
+        "comic_turn": "O risco físico desaparece e o verdadeiro impacto passa a ser o julgamento alheio.",
+        "scene_payoff": "capacete integral contrasta com a pequena scooter parada"
+      },
+      {
+        "id": 3,
+        "mechanic": "escalada",
+        "setup": "CAPACETE PRONTO PARA O RALI",
+        "escalation": "SCOOTER PRONTA PARA A CICLOVIA",
+        "punchline": "A DUPLA NÃO FEZ O BRIEFING",
+        "comic_turn": "Piloto e veículo parecem ter recebido missões completamente diferentes antes de sair.",
+        "scene_payoff": "equipamento de competição e veículo urbano parecem pertencer a trajetos diferentes"
+      },
+      {
+        "id": 4,
+        "mechanic": "observacao especifica",
+        "setup": "COMPROU O CAPACETE PRIMEIRO",
+        "escalation": "SOBROU DINHEIRO PARA A SCOOTER",
+        "punchline": "O MOTOR VEM NO PRÓXIMO SALÁRIO",
+        "comic_turn": "A diferença de escala vira consequência de um orçamento gasto na ordem errada.",
+        "scene_payoff": "capacete sofisticado domina visualmente a scooter simples"
+      },
+      {
+        "id": 5,
+        "mechanic": "expectativa versus realidade",
+        "setup": "O CAPACETE PROMETEU MOTOCROSS",
+        "escalation": "A SCOOTER ENTREGOU CALÇADA",
+        "punchline": "CADA UM FEZ SUA PARTE",
+        "comic_turn": "Equipamento e veículo cumprem expectativas opostas dentro da mesma cena urbana.",
+        "scene_payoff": "capacete extremo e scooter urbana dividem o mesmo enquadramento"
+      }
+    ]
+  }
+]

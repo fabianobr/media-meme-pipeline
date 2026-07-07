@@ -45,6 +45,16 @@ python3 scripts/check_environment.py --mode render --homelab-root ../homelab-ai
 python3 scripts/reddit_meme_dry_run.py --subreddit popular --limit 3
 ```
 
+Para manter a avaliação de humor independente, configure modelos distintos para escritor
+e crítico com `--humor-model` e `--humor-critic-model`. Respostas inválidas, vazias ou fora
+do schema são rejeitadas e nunca recebem notas artificiais.
+
+Para avaliar conceitos previamente curados sem chamar o escritor, use `--concepts-file`.
+O arquivo deve associar cada `post_id` a 1-5 candidatas com `id`, `mechanic`, `setup`,
+`escalation`, `punchline`, `comic_turn` e `scene_payoff`. As sementes ainda passam pelo
+crítico independente, verificações determinísticas e rubrica; sua origem não concede
+aprovação automática.
+
 Antes de usar `--accept-model-licenses`, revise os campos `license_url` em [infra/models.lock.yaml](infra/models.lock.yaml). `HF_TOKEN` é lido somente do ambiente, não é salvo pelo instalador e nunca deve entrar em `.env` versionado.
 
 O bootstrap é idempotente, não executa `sudo`, não inicia n8n ou Hermes e sobe somente Ollama e ComfyUI pelo profile `media-pipeline`.
@@ -92,12 +102,13 @@ data/
   media-pipeline/        # local e ignorado pelo Git
 ```
 
-Para narração PT-BR com `edge-tts`:
+O caminho padrão LTX 2.3 gera áudio e vídeo nativamente no ComfyUI. `ffprobe` valida o MP4; `ffmpeg` permanece disponível apenas para diagnóstico e modos legados de revisão:
 
 ```bash
-python3 -m venv data/media-pipeline/.venv-edge-tts
-data/media-pipeline/.venv-edge-tts/bin/pip install edge-tts
+docker build -f infra/Dockerfile.runtime -t media-meme-pipeline:local .
 ```
+
+O pipeline não instala dependências durante uma execução. Para execução no host, ative a `.venv` criada pelo bootstrap.
 
 ## Dry-Run Reddit
 
@@ -128,6 +139,10 @@ python3 scripts/daily_reddit_meme_pipeline.py \
 
 Este modo não exige n8n, Telegram nem ComfyUI. O render LTX chama ComfyUI diretamente; os webhooks n8n permanecem apenas para fluxos legados/opcionais.
 
+Para repetir uma seleção congelada sem consultar o Reddit, use `--posts-file caminho/selected.json`. Toda execução faz um preflight único e grava `preflight.json`; dependências obrigatórias ausentes encerram o processo antes de geração ou renderização.
+
+`concepts.json` usa um contrato versionado que separa `post`, `joke`, `evaluations`, `production`, `artifacts` e `execution`. Estados válidos são `pending`, `running`, `approved`, `rejected` e `failed`. Uma crítica ausente ou inválida sempre rejeita o conceito.
+
 ## Validação
 
 ```bash
@@ -150,7 +165,7 @@ Credenciais do Hermes/Telegram permanecem em `~/.hermes/.env`. O pipeline só en
 
 ## Render de Vídeo LTX 2.3
 
-Renderiza um caso de teste com duração alvo de 15s:
+O caminho principal é I2V nativo no ComfyUI: o pipeline gera uma imagem-base limpa, usa essa imagem como referência para o LTX 2.3 e mantém áudio/vídeo no mesmo grafo. O grafo I2V segue o template oficial do ComfyUI (`video_ltx2_3_i2v`): passe base em meia resolução com schedule distilled de 8 steps e CFG 1.0, upscale latente espacial ×2 e refine de 3 steps. O preset inicial é curto para validação: 1280×720 finais e 49 frames.
 
 ```bash
 python3 scripts/daily_reddit_meme_pipeline.py \
@@ -160,7 +175,7 @@ python3 scripts/daily_reddit_meme_pipeline.py \
   --max-age-hours 48 \
   --make-video \
   --video-engine ltx23 \
-  --video-duration 15 \
+  --ltx23-input-mode image \
   --only-index 1 \
   --output-root data/media-pipeline/reddit-ltx-test \
   --run-tag ltx-test \
@@ -178,11 +193,16 @@ post + descrição da imagem
   -> candidatos de humor e crítica
   -> roteiro semântico do vídeo
   -> compilador de prompt cinematográfico literal
-  -> segmento T2V inicial
-  -> continuação I2V pelo último frame
-  -> continuação I2V pelo último frame
-  -> mix de narração PT-BR
+  -> workflow ComfyUI LTX 2.3 nativo
+  -> vídeo e áudio gerados no mesmo grafo
+  -> validação local do MP4
 ```
+
+Os grafos em `workflows/03-ltx23-native-t2v-audio-api.json` e `workflows/05-ltx23-official-i2v-audio-api.json` são as fontes de verdade. O grafo `04` (I2V construído à mão) foi aposentado após reprovar no gate visual com pseudo-texto e drift; a causa raiz foi o regime de guidance/schedule incompatível com o LoRA distilled, não o prompt. O Python apenas parametriza entradas declaradas, enfileira em `/prompt`, consulta `/history`, baixa e valida o resultado. O modo default para `ltx23` é `--ltx23-input-mode image`; `prompt` fica como baseline técnico T2V.
+
+O smoke test técnico do T2V nativo executou sem OOM, mas foi reprovado visualmente por pseudo-texto e marcas de interface. Consulte `docs/experiments/2026-06-28-ltx23-native-av.md`. Não escale T2V para produção sem novo gate visual; o próximo experimento deve validar I2V com imagem-base limpa.
+
+O smoke I2V de 29 de junho passou no gate técnico e preservou a composição sem pseudo-texto nos frames inspecionados. Consulte `docs/experiments/2026-06-29-ltx23-native-i2v.md`. O próximo gate é um conceito real congelado com 49 frames e avaliação humana.
 
 Prompts enviados ao LTX devem conter somente ação observável, personagem, objeto, ambiente, câmera, luz e som. Labels como `setup`, `complication`, `punchline` e offsets globais como `5-10s` são metadados internos e não devem ir para o modelo.
 
