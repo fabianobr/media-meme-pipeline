@@ -516,6 +516,26 @@ class ComfyWorkflowTests(unittest.TestCase):
         self.assertEqual(concept["ltx_video_input_mode"], "ltx23-native-i2v-audio-video")
         self.assertEqual(concept["ltx23_workflow"], "workflows/05-ltx23-official-i2v-audio-api.json")
 
+    def test_descriptive_punchline_is_rejected_deterministically(self) -> None:
+        source_text = "Um gato branco dormindo em uma cama branca. 2 years difference."
+        descriptive = {
+            "setup": "EU ABRI O BRASIL",
+            "escalation": "ESPERAVA UMA CENA DE TENSÃO",
+            "punchline": "ENCONTREI UM GATO DORMINDO",
+            "comic_turn": "a expectativa de caos vira uma cena calma de um gato dormindo",
+        }
+        issues = pipeline.humor_candidate_issues(descriptive, source_text)
+        self.assertTrue(any("descreve a cena visivel" in issue for issue in issues))
+
+        reinterpreting = {
+            "setup": "GERALD NÃO É NOME DE GATO",
+            "escalation": "É NOME DE QUEM TE ENCARA ASSIM",
+            "punchline": "ANTES DE NEGAR SEU EMPRÉSTIMO",
+            "comic_turn": "a punchline transforma o olhar do gato em um gerente de banco",
+        }
+        issues = pipeline.humor_candidate_issues(reinterpreting, "Um gato laranja encarando a camera. Cats with very human names.")
+        self.assertFalse(any("descreve a cena visivel" in issue for issue in issues))
+
     def test_native_prompt_requests_ptbr_speech(self) -> None:
         concept = {
             "top_text": "MEU GATO TINHA NOME", "bottom_text": "AGORA É BEANSTER",

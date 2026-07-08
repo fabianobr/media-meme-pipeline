@@ -1143,6 +1143,11 @@ def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> 
         issues.append("inventa marca ou servico ausente: " + ", ".join(invented_services))
     if len(comic_turn.split()) < 7 or comic_turn.count(",") >= 3:
         issues.append("comic_turn nao explica uma mudanca de sentido")
+    punchline_tokens = token_set(punchline)
+    if punchline_tokens and source_text:
+        described = punchline_tokens & token_set(source_text)
+        if len(described) / len(punchline_tokens) >= 0.6:
+            issues.append("punchline apenas descreve a cena visivel; falta reinterpretacao")
     return issues
 
 
@@ -1302,6 +1307,14 @@ Regras obrigatorias:
 - Modelo de compressao (nao copie os substantivos): para uma foto de guarda-chuva enorme sob garoa,
   setup "CHUVA: DOIS PINGOS", escalada "ELE ABRIU O EQUIPAMENTO", punchline "DEFESA CIVIL PARTICULAR".
   Note que a punchline nomeia uma interpretacao nova; ela nao diz apenas que o guarda-chuva e grande.
+- Segundo modelo aprovado em producao (nao copie os substantivos): para uma foto de gato de nome
+  humano encarando a camera, setup "GERALD NAO E NOME DE GATO", escalada "E NOME DE QUEM TE ENCARA ASSIM",
+  punchline "ANTES DE NEGAR SEU EMPRESTIMO". A virada da ao sujeito uma profissao, papel social ou
+  intencao inesperada e especifica; esse e o padrao que mais aprova.
+- A punchline nunca pode ser uma frase aleatoria: se ela nao se conecta ao setup por uma palavra ou
+  premissa, descarte e escreva outra.
+- A punchline nunca pode descrever o que a imagem ja mostra nem apenas revelar a cena; o climax
+  precisa estar na punchline. Se o setup for a parte engracada e a punchline so "explicar", descarte.
 {f"- Corrija estes problemas apontados na rodada anterior: {feedback}" if feedback else ""}
 
 Fonte:
@@ -1346,6 +1359,12 @@ Pontue de 0 a 10:
 - surprise: muda o sentido do setup
 - laugh: tem potencial real de humor
 - visual_payoff: funciona com os elementos ja visiveis
+
+Teste da punchline (obrigatorio antes de pontuar laugh e surprise): se a punchline apenas
+descreve o que a imagem ja mostra, ou desfaz a expectativa do setup sem dar uma
+reinterpretacao nova (papel, profissao ou intencao inesperada para o sujeito), entao
+laugh e surprise valem no maximo 5. A parte engracada precisa estar na punchline,
+nao no setup.
 
 Use esta ancora de escala de forma literal em todos os criterios:
 - 5: apenas funcional ou descritivo;
@@ -3521,7 +3540,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--vision-timeout", type=int, default=90)
     parser.add_argument("--describe-source-images", action="store_true", default=True)
     parser.add_argument("--no-describe-source-images", action="store_false", dest="describe_source_images")
-    parser.add_argument("--concept-timeout", type=int, default=60)
+    parser.add_argument("--concept-timeout", type=int, default=600)
     parser.add_argument("--preflight-timeout", type=int, default=5)
     parser.add_argument("--skip-ollama-concepts", action="store_true")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
