@@ -267,6 +267,53 @@ class HumorGateTests(unittest.TestCase):
         self.assertEqual(len(result["humor_review"]["critics"]), 2)
         self.assertEqual(request.call_count, 2)
 
+    def test_vision_capable_critic_receives_the_actual_image(self) -> None:
+        candidates = [{
+            "id": 1, "mechanic": "contraste", "setup": "GERALD CANDIDATO",
+            "escalation": "ENCARA A CÂMERA SOBRE O TRAVESSEIRO", "punchline": "A CASA É DELE",
+            "comic_turn": "O nome formal transforma o gato sério no proprietário da casa.",
+            "scene_payoff": "gato laranja sério sobre o travesseiro",
+        }]
+        review = {"message": {"content": pipeline.json.dumps({
+            "approved": True, "winner_id": 1,
+            "scores": {"source_fit": 9, "natural_ptbr": 9, "surprise": 9, "laugh": 9, "visual_payoff": 8},
+            "reason": "passes",
+        })}}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image_path = Path(tmpdir) / "source.jpg"
+            pipeline.Image.new("RGB", (32, 32), color="orange").save(image_path)
+            with patch.object(pipeline, "request_json", side_effect=[review, review]) as request:
+                pipeline.improve_humor_concept(
+                    self.post, self.concept, "writer", 1, "cat", critic_model="llama3:latest",
+                    second_critic_model="qwen2.5vl:7b", seed_candidates=candidates,
+                    image_path=image_path,
+                )
+        text_critic_message = request.call_args_list[0].kwargs["json"]["messages"][1]
+        vision_critic_message = request.call_args_list[1].kwargs["json"]["messages"][1]
+        self.assertNotIn("images", text_critic_message)
+        self.assertIn("images", vision_critic_message)
+        self.assertEqual(len(vision_critic_message["images"]), 1)
+
+    def test_no_image_path_means_no_critic_ever_gets_images(self) -> None:
+        candidates = [{
+            "id": 1, "mechanic": "contraste", "setup": "GERALD CANDIDATO",
+            "escalation": "ENCARA A CÂMERA SOBRE O TRAVESSEIRO", "punchline": "A CASA É DELE",
+            "comic_turn": "O nome formal transforma o gato sério no proprietário da casa.",
+            "scene_payoff": "gato laranja sério sobre o travesseiro",
+        }]
+        review = {"message": {"content": pipeline.json.dumps({
+            "approved": True, "winner_id": 1,
+            "scores": {"source_fit": 9, "natural_ptbr": 9, "surprise": 9, "laugh": 9, "visual_payoff": 8},
+            "reason": "passes",
+        })}}
+        with patch.object(pipeline, "request_json", side_effect=[review, review]) as request:
+            pipeline.improve_humor_concept(
+                self.post, self.concept, "writer", 1, "cat", critic_model="llama3:latest",
+                second_critic_model="qwen2.5vl:7b", seed_candidates=candidates,
+            )
+        for call in request.call_args_list:
+            self.assertNotIn("images", call.kwargs["json"]["messages"][1])
+
 
 class FrozenConceptSeedTests(unittest.TestCase):
     def test_loader_rejects_more_than_five_candidates(self) -> None:

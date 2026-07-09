@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import io
 import json
 import math
 import os
@@ -1151,6 +1152,24 @@ def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> 
     return issues
 
 
+def is_vision_capable_model(model_name: str) -> bool:
+    lowered = model_name.lower()
+    return any(marker in lowered for marker in ("vl", "vision", "llava"))
+
+
+def encode_image_for_vision(image_path: Path, max_side: int = 1280) -> str | None:
+    if not image_path.exists():
+        return None
+    try:
+        image = Image.open(image_path).convert("RGB")
+        image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=92)
+        return base64.b64encode(buffer.getvalue()).decode("ascii")
+    except Exception:
+        return None
+
+
 def improve_humor_concept(
     post: reddit.RedditPost,
     concept: dict[str, Any],
@@ -1160,11 +1179,13 @@ def improve_humor_concept(
     critic_model: str | None = None,
     second_critic_model: str | None = None,
     seed_candidates: list[dict[str, Any]] | None = None,
+    image_path: Path | None = None,
 ) -> dict[str, Any]:
     critic_model = critic_model or model
     round_limit = 1 if seed_candidates is not None else MAX_HUMOR_ROUNDS
     execution = concept.setdefault("execution", {"state": "pending", "attempts": {}})
     llm_calls = execution.setdefault("llm_calls", [])
+    encoded_critic_image = encode_image_for_vision(image_path) if image_path is not None else None
     if seed_candidates is not None:
         execution["humor_source"] = "frozen_seeds"
 
@@ -1352,6 +1373,7 @@ Fonte:
 Avalie as alternativas como editor de memes brasileiro rigoroso.
 Rejeite frases que descrevem o post, explicam a imagem, inventam elementos ausentes,
 parecem slogan, usam portugues artificial ou nao possuem uma virada clara.
+{"Se uma imagem estiver anexada a esta mensagem, baseie source_fit, laugh, surprise e visual_payoff no que você realmente ve na imagem, nao apenas na descricao textual abaixo." if encoded_critic_image else ""}
 
 Pontue de 0 a 10:
 - source_fit: usa apenas fatos concretos do post
@@ -1393,6 +1415,9 @@ Alternativas:
             passing_ids_by_critic: list[set[int]] = []
             score_names = ("source_fit", "natural_ptbr", "surprise", "laugh", "visual_payoff")
             for critic_index, active_critic_model in enumerate(critic_models, 1):
+                critic_user_message: dict[str, Any] = {"role": "user", "content": critic_prompt}
+                if encoded_critic_image and is_vision_capable_model(active_critic_model):
+                    critic_user_message["images"] = [encoded_critic_image]
                 critic_data = timed_humor_request(
                     f"critic_{critic_index}",
                     round_number,
@@ -1403,7 +1428,7 @@ Alternativas:
                         "format": review_schema,
                         "messages": [
                             {"role": "system", "content": "Voce elimina memes fracos antes que gastem tempo de renderizacao."},
-                            {"role": "user", "content": critic_prompt},
+                            critic_user_message,
                         ],
                         "options": {"temperature": 0.1, "num_predict": 900},
                     },
@@ -1543,10 +1568,12 @@ def generate_concepts(
     humor_second_critic_model: str | None = None,
     seed_candidates_by_post: dict[str, list[dict[str, Any]]] | None = None,
     source_reviews: dict[str, dict[str, Any]] | None = None,
+    image_paths: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     visual_descriptions = visual_descriptions or {}
     seed_candidates_by_post = seed_candidates_by_post or {}
     source_reviews = source_reviews or {}
+    image_paths = image_paths or {}
     compact_posts = [
         {
             "index": idx,
@@ -1667,6 +1694,7 @@ Posts:
             set_stage_state(concept, "source_gate", "rejected", reason)
             normalized.append(concept)
             continue
+        image_path_str = image_paths.get(post.id)
         concept = improve_humor_concept(
             post,
             concept,
@@ -1676,6 +1704,7 @@ Posts:
             critic_model=humor_critic_model,
             second_critic_model=humor_second_critic_model,
             seed_candidates=seed_candidates_by_post.get(post.id),
+            image_path=Path(image_path_str) if image_path_str else None,
         )
         if concept.get("humor_approved"):
             concept["video_script"] = build_video_script(post, concept, visual_description)
@@ -3534,8 +3563,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--humor-second-critic-model",
-        default="gemma3:12b",
-        help="Second blind Ollama humor critic; approval requires consensus with the first critic.",
+        default="qwen2.5vl:7b",
+        help=(
+            "Second Ollama humor critic; approval requires consensus with the first critic. "
+            "Vision-capable model names (containing 'vl', 'vision' or 'llava') receive the actual "
+            "source image alongside the text so scoring is not blind to visual nuance."
+        ),
     )
     parser.add_argument("--vision-timeout", type=int, default=90)
     parser.add_argument("--describe-source-images", action="store_true", default=True)
@@ -3746,6 +3779,7 @@ def main() -> int:
                 humor_second_critic_model=args.humor_second_critic_model,
                 seed_candidates_by_post=seed_candidates_by_post,
                 source_reviews=source_reviews,
+                image_paths=source_media_paths,
             )
         for concept in concepts:
             approved = bool(concept.get("humor_approved") and concept.get("quality_approved"))
