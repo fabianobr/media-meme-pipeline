@@ -1356,7 +1356,7 @@ Fonte:
                         {"role": "system", "content": "Voce e um redator de humor brasileiro conciso e observacional."},
                         {"role": "user", "content": writer_prompt},
                     ],
-                    "options": {"temperature": 0.85, "num_predict": 750},
+                    "options": {"temperature": 0.85, "num_predict": 1500},
                     },
                 )
                 writer_content = (writer_data.get("message") or {}).get("content") or ""
