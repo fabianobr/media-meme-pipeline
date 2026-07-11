@@ -114,8 +114,9 @@ e cada uma mudou o próximo passo:
 ## Próximos passos
 
 - [x] Concluir a rodada e2e com timeout de 1h — terminou em ~20 min, 2/15 aprovados.
-- [ ] Escolher uma das 2 candidatas aprovadas (ou ambas) e renderizar o vídeo — ainda não há
-      um vídeo 100% autônomo (fora do Gerald) revisado pelo usuário.
+- [ ] Renderizando as 2 candidatas aprovadas (`data/media-pipeline/e2e-fresh-render/`, 5 s
+      cada, 1024×576) — em andamento, aguardando revisão humana. Primeiro vídeo 100%
+      autônomo (fora do Gerald) do pipeline.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
