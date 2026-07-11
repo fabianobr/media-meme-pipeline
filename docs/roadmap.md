@@ -142,7 +142,16 @@ e cada uma mudou o próximo passo:
   AMIZADE. MAS A FOTO MOSTRA CAVALO E GATO JUNTOS, HUMMM ESTRANHO... TREINAMENTO PARA
   COEXISTÊNCIA, SERA? RARARARA." (20 palavras vs 14 do original) — hipótese: mais material
   falado preenche a duração com mais naturalidade do que pedir pausa por instrução (que já
-  falhou). Testando com a mesma imagem-base fixa e 8s/768×448.
+  falhou). Testado com a mesma imagem-base fixa e 8s/768×448.
+- **Resultado misto, medido objetivamente**: o texto mais longo de fato preencheu o vazio
+  anterior (fala ativa e alta, -6 a -8dB, até 7,9s), mas parece ter passado do ponto —
+  praticamente sem pausa sobrando no final (queda brusca só em 8,0s, na borda dos 8,04s do
+  clipe). Risco de cortar a risada final "RARARARA" bem na ponta. Boca fechada no último
+  frame (inconclusivo visualmente). Vídeo enviado ao usuário para julgar de ouvido.
+- **Padrão emergindo**: o total de palavras faladas precisa ficar num ponto de equilíbrio
+  com a duração do clipe — nem tão curto que sobra silêncio morto no meio/fim, nem tão longo
+  que estoura a borda. Não há controle direto por instrução de texto (testado e não
+  funcionou); o ajuste tem que ser por tentativa de contagem de palavras vs. duração.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
