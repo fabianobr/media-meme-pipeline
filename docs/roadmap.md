@@ -148,18 +148,22 @@ e cada uma mudou o próximo passo:
   praticamente sem pausa sobrando no final (queda brusca só em 8,0s, na borda dos 8,04s do
   clipe). Risco de cortar a risada final "RARARARA" bem na ponta. Boca fechada no último
   frame (inconclusivo visualmente). Vídeo enviado ao usuário para julgar de ouvido.
-- **Usuário reportou que o áudio soou igual ao anterior** (não percebeu o texto novo sendo
-  falado). Investigação direto no histórico do ComfyUI (não no que o pipeline registra, mas
-  no prompt realmente recebido pelo render): confirmado que o texto novo completo FOI
-  enviado corretamente ao modelo (`"...mas a foto mostra cavalo e gato juntos, hummm
-  estranho... treinamento para coexistência, sera? rararara"`). Não é bug de propagação de
-  texto no pipeline.
-- **Causa raiz real: o modelo de áudio nativo do LTX não fala fielmente conteúdo textual
-  fino.** Mesmo padrão da falha de pausa por instrução — o modelo parece re-sintetizar a
-  fala à sua maneira em vez de "ler" literalmente o texto entre aspas; preenchimentos e
-  interjeições extras não saem perceptíveis. **Conclusão: controle fino de conteúdo/pacing
-  de fala por texto no prompt não é confiável nesse modelo** (2/2 tentativas nesse sentido
-  falharam: pausa explícita e texto adicional).
+- **Usuário reportou que o áudio soou igual ao anterior** e questionou a conclusão (com
+  razão). Investigação inicial (indireta, por padrão de volume/silêncio) levou a uma
+  **conclusão errada** de que o modelo não obedece o texto. Corrigido verificando de fato:
+  transcrição com Whisper local dos dois áudios.
+  - Texto antigo transcrito: "O treinador mandou foto de amizade. Foto mostra cavalo e gato
+    juntos. Treinamento para a coexistência."
+  - Texto novo transcrito: "O treinador mandou foto de amizade, mas a foto mostra cavalo e
+    gato juntos. Hum, estranho. Treinamento para a coexistência será rararar."
+  - **O modelo seguiu o texto novo quase palavra por palavra** — "mas", "hum estranho",
+    "será" e "rararar" estão todos presentes. A conclusão anterior ("o modelo não obedece o
+    texto") estava errada e foi retirada.
+- **Causa raiz real, mais simples**: com o texto mais longo, a fala ocupa quase toda a
+  duração de 8s, sem sobrar respiro no final (consistente com a medição de volume anterior,
+  agora explicada corretamente) — é só uma questão de contagem de palavras vs. duração do
+  clipe, não uma limitação do modelo em seguir o prompt. Ajuste: pequeno aumento de duração
+  (~210-220 frames) para dar folga ao final sem precisar cortar o texto.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
