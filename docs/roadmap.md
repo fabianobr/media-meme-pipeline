@@ -117,9 +117,16 @@ e cada uma mudou o próximo passo:
 - [x] Renderizadas as 2 candidatas aprovadas (`data/media-pipeline/e2e-fresh-render/`,
       primeiros vídeos 100% autônomos do pipeline). Feedback do usuário: ambos cortam no
       meio da fala — falta pausa antes/depois da narração dentro dos 5,16 s.
-- [ ] Corrigido o prompt de áudio para pedir pausa explícita antes e depois da fala
-      (`compose_ltx23_segment_prompts`); testando com re-render de 1 candidata antes de
-      regravar as 2 e reenviar.
+- [x] Tentativa 1 (prompt): pedir pausa explícita antes/depois da fala no prompt de áudio.
+      **Resultado negativo, medido objetivamente** (silencedetect + volumedetect): fala ativa
+      já em t=0,0s e ainda em t=4,9s de um clipe de 5,16s — padrão de silêncio idêntico
+      antes/depois da mudança. O modelo de áudio nativo não obedece pedido de pausa por
+      texto; ele preenche a duração inteira com a fala. Prompt revertido mentalmente como
+      lever inútil para esse problema (o texto do prompt continua com o pedido de pausa por
+      ora, mas não deve ser considerado a solução).
+- [ ] Tentativa 2 (duração): renderizar o mesmo conceito a 8s/768×448 (envelope já validado
+      para o Gerald) para dar folga temporal real à fala, em vez de tentar controlar por
+      texto. Em teste.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
