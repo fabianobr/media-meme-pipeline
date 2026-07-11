@@ -163,7 +163,8 @@ e cada uma mudou o próximo passo:
   duração de 8s, sem sobrar respiro no final (consistente com a medição de volume anterior,
   agora explicada corretamente) — é só uma questão de contagem de palavras vs. duração do
   clipe, não uma limitação do modelo em seguir o prompt. Ajuste: pequeno aumento de duração
-  (~210-220 frames) para dar folga ao final sem precisar cortar o texto.
+  (200→225 frames, ~9s) para dar folga ao final sem precisar cortar o texto. Em teste, com
+  verificação por Whisper (conteúdo) + volumedetect (timing) desta vez, não só um dos dois.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
