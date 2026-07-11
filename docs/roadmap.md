@@ -114,9 +114,12 @@ e cada uma mudou o próximo passo:
 ## Próximos passos
 
 - [x] Concluir a rodada e2e com timeout de 1h — terminou em ~20 min, 2/15 aprovados.
-- [ ] Renderizando as 2 candidatas aprovadas (`data/media-pipeline/e2e-fresh-render/`, 5 s
-      cada, 1024×576) — em andamento, aguardando revisão humana. Primeiro vídeo 100%
-      autônomo (fora do Gerald) do pipeline.
+- [x] Renderizadas as 2 candidatas aprovadas (`data/media-pipeline/e2e-fresh-render/`,
+      primeiros vídeos 100% autônomos do pipeline). Feedback do usuário: ambos cortam no
+      meio da fala — falta pausa antes/depois da narração dentro dos 5,16 s.
+- [ ] Corrigido o prompt de áudio para pedir pausa explícita antes e depois da fala
+      (`compose_ltx23_segment_prompts`); testando com re-render de 1 candidata antes de
+      regravar as 2 e reenviar.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).

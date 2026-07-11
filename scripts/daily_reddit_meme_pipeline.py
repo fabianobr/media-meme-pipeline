@@ -1956,8 +1956,10 @@ def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, An
     def audio_sentence(text: str) -> str:
         if text:
             return (
-                'Audio: a calm adult Brazilian Portuguese voice-over says with dry comic timing: '
-                f'"{text.lower().rstrip(".")}". Quiet indoor room tone.'
+                "Audio: it stays silent for a brief beat first, then a calm adult Brazilian "
+                "Portuguese voice-over says unhurried, with a clear pause between each sentence: "
+                f'"{text.lower().rstrip(".")}". '
+                "A brief silent beat after the voice-over finishes speaking. Quiet indoor room tone."
             )
         return "Audio: natural Brazilian Portuguese narration with dry comic timing. Quiet indoor room tone."
 
