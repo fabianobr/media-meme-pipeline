@@ -128,7 +128,15 @@ e cada uma mudou o próximo passo:
       parcial, medido objetivamente**: pausa real de ~1,08s no final (fala termina ~6,94s,
       silêncio até 8,02s) — resolve o corte antes do fim. Início ainda sem pausa (fala
       começa em t=0,0s) — a duração maior não corrigiu isso, só o pedido de texto tentou (e
-      falhou). Aguardando avaliação humana do resultado completo.
+      falhou).
+- **Falha de metodologia encontrada pelo usuário**: o teste de 8s usou uma pasta de saída
+  nova, e a geração da imagem-base é ela mesma não-determinística — o cavalo sumiu da
+  composição por acaso, sem relação com a variável testada (duração). Corrigido fixando a
+  imagem-base aprovada (copiada para o novo diretório com o nome esperado, acionando o
+  `Reusing completed image` do pipeline) antes de re-testar.
+- **Feedback sobre o texto**: a punchline "TREINAMENTO PARA COEXISTENCIA" é curta/abstrata
+  demais — falta uma virada vívida como a do Gerald ("ANTES DE NEGAR SEU EMPRÉSTIMO").
+  Aguardando sugestão do usuário para o texto.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
