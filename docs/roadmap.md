@@ -133,7 +133,9 @@ e cada uma mudou o próximo passo:
   nova, e a geração da imagem-base é ela mesma não-determinística — o cavalo sumiu da
   composição por acaso, sem relação com a variável testada (duração). Corrigido fixando a
   imagem-base aprovada (copiada para o novo diretório com o nome esperado, acionando o
-  `Reusing completed image` do pipeline) antes de re-testar.
+  `Reusing completed image` do pipeline) antes de re-testar. **Confirmado**: com a imagem
+  fixa, o cavalo volta a aparecer em t=0 e a pausa final se reproduz de forma limpa (~1,3s,
+  6,72s→8,02s) — a causa raiz do sumiço era mesmo a regeneração da imagem, não o vídeo.
 - **Feedback sobre o texto**: a punchline "TREINAMENTO PARA COEXISTENCIA" é curta/abstrata
   demais — falta uma virada vívida como a do Gerald ("ANTES DE NEGAR SEU EMPRÉSTIMO").
   Usuário sugeriu reescrita com conectivos e reações faladas: "TREINADOR MANDOU FOTO DE
