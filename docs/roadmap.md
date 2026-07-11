@@ -148,10 +148,18 @@ e cada uma mudou o próximo passo:
   praticamente sem pausa sobrando no final (queda brusca só em 8,0s, na borda dos 8,04s do
   clipe). Risco de cortar a risada final "RARARARA" bem na ponta. Boca fechada no último
   frame (inconclusivo visualmente). Vídeo enviado ao usuário para julgar de ouvido.
-- **Padrão emergindo**: o total de palavras faladas precisa ficar num ponto de equilíbrio
-  com a duração do clipe — nem tão curto que sobra silêncio morto no meio/fim, nem tão longo
-  que estoura a borda. Não há controle direto por instrução de texto (testado e não
-  funcionou); o ajuste tem que ser por tentativa de contagem de palavras vs. duração.
+- **Usuário reportou que o áudio soou igual ao anterior** (não percebeu o texto novo sendo
+  falado). Investigação direto no histórico do ComfyUI (não no que o pipeline registra, mas
+  no prompt realmente recebido pelo render): confirmado que o texto novo completo FOI
+  enviado corretamente ao modelo (`"...mas a foto mostra cavalo e gato juntos, hummm
+  estranho... treinamento para coexistência, sera? rararara"`). Não é bug de propagação de
+  texto no pipeline.
+- **Causa raiz real: o modelo de áudio nativo do LTX não fala fielmente conteúdo textual
+  fino.** Mesmo padrão da falha de pausa por instrução — o modelo parece re-sintetizar a
+  fala à sua maneira em vez de "ler" literalmente o texto entre aspas; preenchimentos e
+  interjeições extras não saem perceptíveis. **Conclusão: controle fino de conteúdo/pacing
+  de fala por texto no prompt não é confiável nesse modelo** (2/2 tentativas nesse sentido
+  falharam: pausa explícita e texto adicional).
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
