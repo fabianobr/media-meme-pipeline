@@ -124,9 +124,11 @@ e cada uma mudou o próximo passo:
       texto; ele preenche a duração inteira com a fala. Prompt revertido mentalmente como
       lever inútil para esse problema (o texto do prompt continua com o pedido de pausa por
       ora, mas não deve ser considerado a solução).
-- [ ] Tentativa 2 (duração): renderizar o mesmo conceito a 8s/768×448 (envelope já validado
-      para o Gerald) para dar folga temporal real à fala, em vez de tentar controlar por
-      texto. Em teste.
+- [x] Tentativa 2 (duração): renderizar o mesmo conceito a 8s/768×448. **Resultado positivo
+      parcial, medido objetivamente**: pausa real de ~1,08s no final (fala termina ~6,94s,
+      silêncio até 8,02s) — resolve o corte antes do fim. Início ainda sem pausa (fala
+      começa em t=0,0s) — a duração maior não corrigiu isso, só o pedido de texto tentou (e
+      falhou). Aguardando avaliação humana do resultado completo.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
