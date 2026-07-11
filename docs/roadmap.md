@@ -136,7 +136,11 @@ e cada uma mudou o próximo passo:
   `Reusing completed image` do pipeline) antes de re-testar.
 - **Feedback sobre o texto**: a punchline "TREINAMENTO PARA COEXISTENCIA" é curta/abstrata
   demais — falta uma virada vívida como a do Gerald ("ANTES DE NEGAR SEU EMPRÉSTIMO").
-  Aguardando sugestão do usuário para o texto.
+  Usuário sugeriu reescrita com conectivos e reações faladas: "TREINADOR MANDOU FOTO DE
+  AMIZADE. MAS A FOTO MOSTRA CAVALO E GATO JUNTOS, HUMMM ESTRANHO... TREINAMENTO PARA
+  COEXISTÊNCIA, SERA? RARARARA." (20 palavras vs 14 do original) — hipótese: mais material
+  falado preenche a duração com mais naturalidade do que pedir pausa por instrução (que já
+  falhou). Testando com a mesma imagem-base fixa e 8s/768×448.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
