@@ -23,7 +23,7 @@ por dois modelos independentes → (4) imagem-base limpa + roteiro de vídeo →
 |---|---|
 | 1. Seleção de posts | Estável. RSS do Reddit, dry-run disponível. |
 | 2. Gate de fonte | Estável. Scores coerentes; r/popular rende pouca matéria-prima visual (dependência de texto); subreddits de fotos/animais rendem ~40-47% de aprovação. |
-| 3. Humor (escritor + críticos) | **Em calibração ativa.** Taxa de aprovação orgânica subiu de 0/15 → 1/15 nas últimas correções (crítico de visão + fix de token budget). Ainda baixa; ver "Próximos passos". |
+| 3. Humor (escritor + críticos) | **Em calibração ativa.** Taxa de aprovação orgânica: 0/15 → 0/15 → 1/15 → 2/15 nos últimos 4 replays dos mesmos posts congelados, subindo a cada correção (crítico de visão, fix de token budget). Tendência positiva; ver "Próximos passos". |
 | 4. Imagem-base + roteiro | Estável, reaproveitado das runs anteriores sem retrabalho. |
 | 5. Render de vídeo (LTX 2.3) | **Resolvido tecnicamente.** Grafo oficial (`workflows/05`) validado; aprovado pelo usuário em 5 s, 8 s e 10,3 s (2 segmentos). |
 | Render em posts frescos (fora do Gerald) | Ainda não feito — só o texto do conceito foi aprovado numa run e2e até agora; falta gerar imagem-base + vídeo para um post 100% autônomo. |
@@ -68,10 +68,16 @@ segmentos) → `4b0b09b` (adoção do grafo oficial LTX 2.3 I2V).
     que já tinham boas candidatas. Corrigido (750 → 1500).
 11. **Primeira aprovação orgânica em lote**: 1/15 nos mesmos posts congelados, com o crítico
     de visão e o fix de token budget juntos.
-12. **Timeout rígido de 1h** adotado no processo de invocação de runs longas, depois de 3
+12. **Timeout rígido de 1h** adotado no processo de invocação de runs longas (`timeout 3600
+    <comando>` numa única chamada em background, sem waiter secundário), depois de 3
     incidentes em que um processo de aviso (waiter) ficou órfão entre reinícios de sessão e
     nunca notificou — fazendo o trabalho parecer travado por >24h quando na verdade tinha
-    terminado em ~20 minutos.
+    terminado em ~20 minutos. Funcionou de primeira: notificação chegou corretamente.
+13. **Replay com o timeout wrapper: 2/15 aprovados** — confirma a tendência de melhora e
+    valida o padrão de invocação novo. Candidatas: "TREINADOR MANDOU FOTO DE AMIZADE / FOTO
+    MOSTRA CAVALO E GATO JUNTOS / TREINAMENTO PARA COEXISTÊNCIA" (scores 8-9) e "EU ABRI O
+    BRASIL / O GATO FEZ UMA GALÁXIA DE SONO / EU SOU O ASTRÔNOMO DE MIM" (scores 8-9, mas
+    com abertura genérica reciclada — revisar antes de render).
 
 ## Descobertas empíricas que forçaram adaptar o plano
 
@@ -107,10 +113,9 @@ e cada uma mudou o próximo passo:
 
 ## Próximos passos
 
-- [ ] Concluir a rodada e2e em andamento (`data/media-pipeline/e2e-vision-critic-timeout/`,
-      timeout de 1h) e revisar o resultado.
-- [ ] Se algum conceito aprovar, gerar imagem-base e renderizar o vídeo — ainda não há um
-      vídeo 100% autônomo (fora do Gerald) revisado pelo usuário.
+- [x] Concluir a rodada e2e com timeout de 1h — terminou em ~20 min, 2/15 aprovados.
+- [ ] Escolher uma das 2 candidatas aprovadas (ou ambas) e renderizar o vídeo — ainda não há
+      um vídeo 100% autônomo (fora do Gerald) revisado pelo usuário.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
