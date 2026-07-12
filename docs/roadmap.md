@@ -165,6 +165,17 @@ e cada uma mudou o próximo passo:
   clipe, não uma limitação do modelo em seguir o prompt. Ajuste: pequeno aumento de duração
   (200→225 frames, ~9s) para dar folga ao final sem precisar cortar o texto. Em teste, com
   verificação por Whisper (conteúdo) + volumedetect (timing) desta vez, não só um dos dois.
+- [x] **Render de 9s (225 frames, 768×448) verificado das duas formas e aprovado pelo
+      usuário ("sim, funcionou").** Whisper transcreveu "O treinador mandou foto de amizade,
+      mas a foto mostra cavalo e gato juntos, hum, estranho. Treinamento pra coexistência
+      será rararara." — praticamente idêntico ao texto pedido. `silencedetect` confirma pausa
+      final real de 0,93s (fala ativa até 8,05s, silêncio até 8,98s de um clipe de 9,0s).
+      Frame em t=4s confirma o cavalo visível ao fundo (imagem-base fixa reaproveitada
+      corretamente). **Conclusão fechada**: para este padrão de dialogo (~20 palavras), 9s é
+      a duração que resolve o corte no meio da fala sem esticar demais o clipe. Próximo:
+      aplicar o mesmo ajuste (contagem de palavras vs. duração) ao segundo conceito aprovado
+      (gato + projetor de galáxia), que ainda só tem o render original de 5s com o mesmo
+      problema de corte.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
