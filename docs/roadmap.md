@@ -199,6 +199,13 @@ e cada uma mudou o próximo passo:
   aparentemente consome mais tempo por palavra do que a curva do cavalo sugeria. Tentativa
   seguinte: 241 quadros (~9,64s), com folga maior de propósito (cortar a piada é pior do que
   sobrar silêncio).
+- **Terceiro confound na mesma pasta: cache de vídeo por nome de arquivo, não por parâmetros.**
+  Rodar de novo com `--ltx23-frames 241` na mesma pasta (mp4 de 217 quadros já presente)
+  produziu "Reusing completed video" — o pipeline reaproveita o mp4 existente pelo nome,
+  ignorando que a contagem de quadros pedida mudou. `ffprobe` confirmou 8,68s (o antigo), não
+  9,64s. Corrigido apagando o mp4 (e os stills derivados) antes de re-rodar. Lição: ao iterar
+  duração/quadros num teste controlado na mesma pasta, sempre apagar o mp4 anterior — só a
+  imagem-base deve ser fixada, nunca o vídeo.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
