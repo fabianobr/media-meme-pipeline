@@ -206,6 +206,13 @@ e cada uma mudou o próximo passo:
   9,64s. Corrigido apagando o mp4 (e os stills derivados) antes de re-rodar. Lição: ao iterar
   duração/quadros num teste controlado na mesma pasta, sempre apagar o mp4 anterior — só a
   imagem-base deve ser fixada, nunca o vídeo.
+- [x] **Render de 9,64s (241 quadros) do gato+galáxia verificado nas duas formas e enviado ao
+      usuário.** Whisper transcreveu o diálogo completo, incluindo o "de mim" final que tinha
+      sido cortado na tentativa anterior. `silencedetect` confirma ~2,1s de silêncio real no
+      fim (fala termina ~7,54s de um clipe de 9,64s), sem corte no meio. Frame em t=3s
+      confirma o gato e a luz do projetor de galáxia visíveis (imagem-base reaproveitada
+      corretamente). Aguardando julgamento do usuário sobre o ritmo (pausa final talvez
+      generosa demais, mas mais segura do que cortar a piada).
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
