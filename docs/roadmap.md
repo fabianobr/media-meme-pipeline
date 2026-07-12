@@ -246,16 +246,25 @@ e cada uma mudou o próximo passo:
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
 - [ ] Corrigir o deslize gramatical notado na piada aprovada ("um humanos comportado").
-- [ ] Considerar formalizar no README/CLAUDE.md os defaults comprovados
-      (`--concept-timeout 600`, `--humor-second-critic-model qwen2.5vl:7b`,
-      `--ltx23-segments` para vídeos >8s).
-- [ ] Considerar hardening estrutural do falso positivo do funil de humor (crítico aprova
-      virada incoerente com a cena, score alto) — ex.: rubrica com teste explícito de
-      coerência causal setup→punchline, ou revisão humana obrigatória do texto antes de
-      qualquer render, não só para casos de fronteira.
-- [ ] Formalizar a prática de calibração de duração descoberta nesta sessão: não existe
-      fórmula fechada palavras→quadros confiável (a interpolação linear já subestimou uma
-      vez); o processo funcional é iterar com folga generosa e verificar sempre com as duas
-      ferramentas (Whisper para conteúdo, `silencedetect`/`volumedetect` para pausa real) antes
-      de mostrar ao usuário — e sempre apagar o mp4 anterior ao mudar `--ltx23-frames` na
-      mesma pasta (o cache de vídeo é por nome de arquivo, não por parâmetros).
+- [x] **Defaults comprovados formalizados no README** (`--humor-second-critic-model
+      qwen2.5vl:7b`, `--concept-timeout 600`, `--ltx23-segments` para >8s, envelope de
+      memória VRAM/RAM, fluxo de calibração de pacing com Whisper + silencedetect e o aviso
+      sobre o cache de vídeo por nome de arquivo). Commit `6050705`.
+- [x] **Hardening estrutural do falso positivo do funil de humor** (commit `6050705`): novo
+      "teste de ancoragem visual" na rubrica dos críticos — a virada precisa apontar para algo
+      literalmente visível na cena; se usa um conceito abstrato sem pista visual
+      correspondente (o caso real do "Brasil"/"astrônomo"), `visual_payoff` é limitado a 4.
+      Mesma regra adicionada ao prompt do escritor, com o caso do gato+galáxia como
+      contraexemplo concreto. Suíte de 28 testes continua passando; ainda não validado com uma
+      rodada e2e nova (só a mudança de prompt/rubrica, sem replay dos 15 posts congelados).
+- [ ] Deslize gramatical ("um humanos comportado") **não localizável** — o dado de origem
+      (`concepts.json` daquela run específica) já foi sobrescrito por execuções posteriores
+      nas mesmas pastas de saída. Item removido do escopo ativo; sem ação possível sem
+      reproduzir a run original.
+- [ ] Replay dos 15 posts congelados com a rubrica de ancoragem visual nova, para medir se o
+      hardening reduz falsos positivos sem reintroduzir os falsos negativos que o crítico de
+      visão já corrigiu (risco: uma virada legítima mas com metáfora indireta pode ser
+      penalizada demais — vigiar isso no próximo lote).
+- [ ] Avaliar se 1-2/15 de aprovação orgânica (taxa observada antes deste hardening) ainda é
+      aceitável para uso rotineiro, ou se compensa manter curadoria humana como caminho
+      principal e o escritor como gerador de rascunhos.
