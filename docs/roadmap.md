@@ -17,16 +17,17 @@ sustenta uma piada sem inventar elementos?) → (3) geração de humor por um es
 por dois modelos independentes → (4) imagem-base limpa + roteiro de vídeo → (5) render LTX
 2.3 nativo I2V com áudio + revisão humana.
 
-## Estado atual (2026-07-11)
+## Estado atual (2026-07-12)
 
 | Estágio | Situação |
 |---|---|
 | 1. Seleção de posts | Estável. RSS do Reddit, dry-run disponível. |
 | 2. Gate de fonte | Estável. Scores coerentes; r/popular rende pouca matéria-prima visual (dependência de texto); subreddits de fotos/animais rendem ~40-47% de aprovação. |
-| 3. Humor (escritor + críticos) | **Em calibração ativa.** Taxa de aprovação orgânica: 0/15 → 0/15 → 1/15 → 2/15 nos últimos 4 replays dos mesmos posts congelados, subindo a cada correção (crítico de visão, fix de token budget). Tendência positiva; ver "Próximos passos". |
+| 3. Humor (escritor + críticos) | **Em calibração ativa, dois modos de falha mapeados.** Taxa de aprovação orgânica: 0/15 → 0/15 → 1/15 → 2/15 nos últimos 4 replays dos mesmos posts congelados. Falso negativo (crítico cego à imagem subestima piada boa) corrigido com crítico de visão. Falso positivo (crítico aprova com score alto uma virada incoerente com a cena) ainda não corrigido estruturalmente — mitigado caso a caso com revisão humana do texto antes de renderizar. |
 | 4. Imagem-base + roteiro | Estável, reaproveitado das runs anteriores sem retrabalho. |
-| 5. Render de vídeo (LTX 2.3) | **Resolvido tecnicamente.** Grafo oficial (`workflows/05`) validado; aprovado pelo usuário em 5 s, 8 s e 10,3 s (2 segmentos). |
-| Render em posts frescos (fora do Gerald) | Ainda não feito — só o texto do conceito foi aprovado numa run e2e até agora; falta gerar imagem-base + vídeo para um post 100% autônomo. |
+| 5. Render de vídeo (LTX 2.3) | **Resolvido tecnicamente.** Grafo oficial (`workflows/05`) validado; aprovado pelo usuário em 5 s, 8 s e 10,3 s (2 segmentos), e agora também em 9 s / 9,96 s para diálogos mais longos. |
+| Pacing do áudio (corte no meio da fala) | **Resolvido.** Causa raiz: duração insuficiente para a contagem de palavras do diálogo, não o modelo ignorando o texto (confirmado por Whisper). Calibração por tentativa+verificação (Whisper + silencedetect) converge em poucas rodadas; ainda não é uma fórmula fechada. |
+| Render em posts frescos (fora do Gerald) | **Feito para os 2 conceitos aprovados na run e2e de 2026-07-11.** Cavalo+gato aprovado pelo usuário no áudio/vídeo/pacing. Gato+projetor de galáxia teve o texto reescrito em colaboração com o usuário (piada original fazia sentido zero fora da cena) e o resultado final também foi confirmado ok. |
 
 Branch: tudo commitado direto em `main`. Commits-chave (mais recente primeiro):
 `b016ddf` (fix token budget do escritor) → `7ef8ce2` (crítico com visão real) →
@@ -237,6 +238,10 @@ e cada uma mudou o próximo passo:
       corte. Aumentei a duração de 241→249 quadros por precaução (texto 3 palavras mais longo
       que a tentativa anterior que já tinha precisado de mais tempo que o previsto).
       Aguardando julgamento do usuário sobre se a piada agora faz sentido.
+- [x] **Usuário confirmou**: "continuo vendo o gato, fundo azul.. texto e audio estão ok."
+      Os dois conceitos aprovados na run e2e de 2026-07-11 (cavalo+gato e gato+galáxia) estão
+      agora com pacing de áudio correto e piada coerente com a cena, ambos verificados
+      objetivamente (Whisper + silencedetect) e confirmados pelo usuário.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
@@ -244,3 +249,13 @@ e cada uma mudou o próximo passo:
 - [ ] Considerar formalizar no README/CLAUDE.md os defaults comprovados
       (`--concept-timeout 600`, `--humor-second-critic-model qwen2.5vl:7b`,
       `--ltx23-segments` para vídeos >8s).
+- [ ] Considerar hardening estrutural do falso positivo do funil de humor (crítico aprova
+      virada incoerente com a cena, score alto) — ex.: rubrica com teste explícito de
+      coerência causal setup→punchline, ou revisão humana obrigatória do texto antes de
+      qualquer render, não só para casos de fronteira.
+- [ ] Formalizar a prática de calibração de duração descoberta nesta sessão: não existe
+      fórmula fechada palavras→quadros confiável (a interpolação linear já subestimou uma
+      vez); o processo funcional é iterar com folga generosa e verificar sempre com as duas
+      ferramentas (Whisper para conteúdo, `silencedetect`/`volumedetect` para pausa real) antes
+      de mostrar ao usuário — e sempre apagar o mp4 anterior ao mudar `--ltx23-frames` na
+      mesma pasta (o cache de vídeo é por nome de arquivo, não por parâmetros).
