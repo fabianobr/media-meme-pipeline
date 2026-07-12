@@ -213,6 +213,18 @@ e cada uma mudou o próximo passo:
       confirma o gato e a luz do projetor de galáxia visíveis (imagem-base reaproveitada
       corretamente). Aguardando julgamento do usuário sobre o ritmo (pausa final talvez
       generosa demais, mas mais segura do que cortar a piada).
+- **Feedback do usuário sobre o gato+galáxia**: "audio e video perfeitos... o texto com o
+  video e audio não é engraçado, não tem nenhum sentido". Pacing e execução técnica
+  resolvidos, mas a piada em si ("EU ABRI O BRASIL. O GATO FEZ UMA GALAXIA DE SONO. EU SOU O
+  ASTRONOMO DE MIM.") foi julgada sem sentido/sem graça — mesmo tendo passado com consenso
+  dos dois críticos (scores 8-9, incluindo o crítico de visão). Este conceito já tinha sido
+  marcado como suspeito no item 13 acima ("abertura genérica reciclada — revisar antes de
+  render") e o alerta se confirmou. **Achado novo, complementar ao anterior**: a correção do
+  crítico de visão resolveu o problema de subestimar piadas boas (falso negativo), mas não
+  protege contra o crítico aprovar uma piada incoerente com confiança alta (falso positivo) —
+  os dois modos de falha do funil de humor são distintos e a correção de um não resolve o
+  outro. Reabre a pergunta pendente sobre se a aprovação orgânica do escritor (1-2/15) é
+  confiável o bastante para uso sem revisão humana do texto antes de renderizar.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
