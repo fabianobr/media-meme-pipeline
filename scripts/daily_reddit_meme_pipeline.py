@@ -1336,6 +1336,11 @@ Regras obrigatorias:
   premissa, descarte e escreva outra.
 - A punchline nunca pode descrever o que a imagem ja mostra nem apenas revelar a cena; o climax
   precisa estar na punchline. Se o setup for a parte engracada e a punchline so "explicar", descarte.
+- A virada (papel, profissao ou intencao inesperada) precisa se ancorar em algo literalmente
+  visivel na cena (um objeto, uma pose, uma cor, uma expressao) — nunca em um lugar, tema ou
+  conceito abstrato sem nenhuma pista visual correspondente. Exemplo do que descartar: usar
+  "Brasil" ou "astronomo" para um gato sonolento com fundo escuro de luzes, sem nada na cena
+  que sugira essas ideias.
 {f"- Corrija estes problemas apontados na rodada anterior: {feedback}" if feedback else ""}
 
 Fonte:
@@ -1387,6 +1392,15 @@ descreve o que a imagem ja mostra, ou desfaz a expectativa do setup sem dar uma
 reinterpretacao nova (papel, profissao ou intencao inesperada para o sujeito), entao
 laugh e surprise valem no maximo 5. A parte engracada precisa estar na punchline,
 nao no setup.
+
+Teste de ancoragem visual (obrigatorio antes de pontuar visual_payoff): identifique a palavra
+ou ideia central da virada (setup + escalada + punchline). Ela precisa apontar para algo
+literalmente visivel na imagem/descricao (um objeto, uma pose, uma cor, uma expressao). Se a
+virada usa um conceito abstrato ou uma referencia (um lugar, uma profissao, um tema) que nao
+tem nenhum elemento correspondente na cena, ela nao esta ancorada — visual_payoff vale no
+maximo 4, mesmo que a piada pareca engracada isolada do contexto. Uma virada ancorada pode
+muito bem dar um papel/intencao inesperada ao sujeito (ver exemplo do Gerald), mas a pista
+que sustenta esse papel tem que estar na cena, nao inventada do nada.
 
 Use esta ancora de escala de forma literal em todos os criterios:
 - 5: apenas funcional ou descritivo;

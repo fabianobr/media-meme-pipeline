@@ -49,6 +49,14 @@ Para manter a avaliação de humor independente, configure modelos distintos par
 e crítico com `--humor-model` e `--humor-critic-model`. Respostas inválidas, vazias ou fora
 do schema são rejeitadas e nunca recebem notas artificiais.
 
+O segundo crítico (`--humor-second-critic-model`, default `qwen2.5vl:7b`) recebe a imagem-fonte
+real, não só a descrição textual gerada pelo modelo de visão no início do funil — um crítico
+cego à imagem subestima sistematicamente piadas que dependem de nuance visual. Isso reduz
+falsos negativos (piada boa rejeitada), mas não elimina falsos positivos (o funil ainda pode
+aprovar com nota alta uma virada que não se conecta à cena visível); revisar o texto antes de
+renderizar continua recomendado. `--concept-timeout` (default `600`) evita que modelos mais
+lentos/"pensantes" (ex. `qwen3:14b`) percam candidatas por timeout prematuro.
+
 Para avaliar conceitos previamente curados sem chamar o escritor, use `--concepts-file`.
 O arquivo deve associar cada `post_id` a 1-5 candidatas com `id`, `mechanic`, `setup`,
 `escalation`, `punchline`, `comic_turn` e `scene_payoff`. As sementes ainda passam pelo
@@ -203,6 +211,27 @@ Os grafos em `workflows/03-ltx23-native-t2v-audio-api.json` e `workflows/05-ltx2
 O smoke test técnico do T2V nativo executou sem OOM, mas foi reprovado visualmente por pseudo-texto e marcas de interface. Consulte `docs/experiments/2026-06-28-ltx23-native-av.md`. Não escale T2V para produção sem novo gate visual; o próximo experimento deve validar I2V com imagem-base limpa.
 
 O smoke I2V de 29 de junho passou no gate técnico e preservou a composição sem pseudo-texto nos frames inspecionados. Consulte `docs/experiments/2026-06-29-ltx23-native-i2v.md`. O próximo gate é um conceito real congelado com 49 frames e avaliação humana.
+
+### Duração, memória e pausas de áudio
+
+Há dois tetos de memória distintos numa GPU de 16 GB/host de 29 GB de RAM: o teto de VRAM
+afeta o passe de refine em resolução alta (~5s em 1024×576 ou ~8s em 768×448 numa tacada só);
+um teto separado de RAM do host derruba o processo do ComfyUI silenciosamente (sem traceback)
+perto de ~10s numa tacada só. Para vídeos além de ~8s, use `--ltx23-segments 2`: o grafo
+renderiza dois segmentos, o segundo ancorado no último frame extraído do primeiro, e os MP4s
+são concatenados sem recodificar.
+
+O áudio nativo do LTX preenche a duração inteira com a fala — não existe uma forma confiável
+de pedir uma pausa por instrução no prompt (testado e medido: pausa por texto não muda o
+padrão de silêncio). A pausa antes/depois da fala é resultado de sobrar duração além do tempo
+que o diálogo leva para ser falado, não de um pedido no prompt. Não existe fórmula fechada
+palavras→quadros; calibrar por tentativa com folga generosa e verificar sempre com duas
+ferramentas antes de aceitar o resultado — transcrição (`whisper <arquivo> --language
+Portuguese --model small`) para confirmar que o conteúdo falado é o esperado, e
+`ffmpeg -af silencedetect=noise=-30dB:d=0.2` para confirmar que sobra silêncio real no fim
+sem cortar a fala. Ao iterar `--ltx23-frames` na mesma pasta de saída, apague o `.mp4`
+anterior antes de re-renderizar — o pipeline reaproveita um vídeo existente pelo nome do
+arquivo, não pelos parâmetros de render.
 
 Prompts enviados ao LTX devem conter somente ação observável, personagem, objeto, ambiente, câmera, luz e som. Labels como `setup`, `complication`, `punchline` e offsets globais como `5-10s` são metadados internos e não devem ir para o modelo.
 
