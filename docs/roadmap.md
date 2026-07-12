@@ -176,6 +176,13 @@ e cada uma mudou o próximo passo:
       aplicar o mesmo ajuste (contagem de palavras vs. duração) ao segundo conceito aprovado
       (gato + projetor de galáxia), que ainda só tem o render original de 5s com o mesmo
       problema de corte.
+- [ ] **Segundo conceito (gato + projetor de galáxia) em teste com a mesma calibração.**
+      Diálogo de 17 palavras (vs. 14 do cavalo original, 20 da reescrita) — interpolando a
+      curva palavras→frames observada no cavalo (14→200 quadros/8s, 20→225 quadros/9s), o
+      alvo é 217 quadros (~8,68s) a 768×448, com a imagem-base original fixada (evita o
+      confound de regeneração já documentado acima). Render em andamento; será verificado
+      com Whisper + silencedetect antes de mostrar ao usuário, seguindo a metodologia
+      corrigida.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
