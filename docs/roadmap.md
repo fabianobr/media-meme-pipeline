@@ -190,6 +190,15 @@ e cada uma mudou o próximo passo:
   (`e2e-galaxy-duration-test-v2/2026-07-12/`). Lição: ao fixar imagem-base num teste
   controlado, sempre conferir a data corrente do sistema, não assumir a data da sessão
   anterior.
+- **Interpolação linear de palavras→quadros subestimou a duração real necessária.** Com a
+  imagem fixada corretamente (teste limpo desta vez), 217 quadros (8,68s) para o diálogo de
+  17 palavras do gato+galáxia cortou a fala antes do fim: Whisper transcreveu "Eu sou o
+  astrônomo de..." sem o "MIM" final, e `silencedetect` não encontrou nenhum silêncio de
+  cauda (fala ativa até o corte, -13,4dB médio nos últimos 0,68s). Essa piada tem 3 frases
+  curtas com pausas internas longas entre elas (~2,9s de pausa somada nos primeiros 6,9s) —
+  aparentemente consome mais tempo por palavra do que a curva do cavalo sugeria. Tentativa
+  seguinte: 241 quadros (~9,64s), com folga maior de propósito (cortar a piada é pior do que
+  sobrar silêncio).
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
