@@ -183,6 +183,13 @@ e cada uma mudou o próximo passo:
       confound de regeneração já documentado acima). Render em andamento; será verificado
       com Whisper + silencedetect antes de mostrar ao usuário, seguindo a metodologia
       corrigida.
+- **Confound de novo, desta vez pego antes de mostrar ao usuário**: o `--output-root` cria
+  subpastas por data corrente (`2026-07-12`, não `2026-07-11`); fixar a imagem-base na pasta
+  de data errada não aciona o `Reusing completed image` e a imagem foi regenerada do zero de
+  novo. Corrigido criando a pasta com a data de hoje e fixando a imagem lá antes de re-rodar
+  (`e2e-galaxy-duration-test-v2/2026-07-12/`). Lição: ao fixar imagem-base num teste
+  controlado, sempre conferir a data corrente do sistema, não assumir a data da sessão
+  anterior.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
