@@ -225,6 +225,18 @@ e cada uma mudou o próximo passo:
   os dois modos de falha do funil de humor são distintos e a correção de um não resolve o
   outro. Reabre a pergunta pendente sobre se a aprovação orgânica do escritor (1-2/15) é
   confiável o bastante para uso sem revisão humana do texto antes de renderizar.
+- **Reescrita colaborativa do texto**: usuário apontou a causa raiz específica —
+  "Brasil"/"galáxia"/"astrônomo" não têm nada na cena real (só um gato sonolento com fundo
+  azul-escuro de pontinhos de luz do projetor). Duas opções propostas ancoradas na cena
+  visível de fato (padrão Gerald: o gato finge um papel, mas a realidade é mais simples);
+  usuário escolheu a Opção B: **"GANHOU UM CÉU ESTRELADO SÓ PRA ELE. FINGE QUE TÁ
+  CONTEMPLANDO O UNIVERSO. NA VERDADE VAI DORMIR EM 5 MINUTOS."** (20 palavras).
+- [x] **Render final (249 quadros, ~9,96s, 768×448) verificado nas duas formas e enviado.**
+      Whisper confirma o punchline completo ("na verdade, vai dormir em cinco minutos").
+      `silencedetect` confirma ~2,65s de silêncio real no fim (fala termina ~7,32s) — sem
+      corte. Aumentei a duração de 241→249 quadros por precaução (texto 3 palavras mais longo
+      que a tentativa anterior que já tinha precisado de mais tempo que o previsto).
+      Aguardando julgamento do usuário sobre se a piada agora faz sentido.
 - [ ] Avaliar se 1/15 de aprovação é aceitável para uso rotineiro ou se o escritor precisa de
       mais uma rodada de calibração (few-shot adicional, modelo maior, ou aceitar curadoria
       humana como caminho principal e o escritor como gerador de rascunhos).
