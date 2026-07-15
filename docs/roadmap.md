@@ -296,6 +296,16 @@ e cada uma mudou o próximo passo:
   backlog a cada post avaliado (não só ao final) e `flush=True` em todo print de progresso.
   Lição: em qualquer script novo de longa duração, checkpoint incremental + stdout sem buffer
   não são opcionais — sem isso um timeout ou kill perde trabalho de forma silenciosa.
+- [x] **Primeira rodada real com o fix: 6/20 aprovados.** 25 posts buscados no `r/popular`,
+      22 elegíveis por serem imagem (3 vídeo/texto pulados), 6 aprovados no gate de fonte
+      (27% — bem acima do 0/10 observado num teste anterior, provavelmente por mistura de
+      conteúdo diferente no momento da coleta, não por mudança de critério). Aprovados:
+      "I tie it like a belt.", "The first thing she does every morning", "Locomotive nearly
+      engulfed flames in Ontario fires.", "One has brains and the other one has tattoos",
+      "just couldn't resist it", "Adopted this little guy yesterday...". Backlog persistido
+      corretamente em `data/media-pipeline/popular-curated-backlog.json`. Faltam 14 pra
+      fechar 20 — rodar `scripts/reddit_popular_curation.py --target 20` de novo mais tarde
+      (o feed muda com o tempo; rodar de novo agora tende a repetir os mesmos 25 já vistos).
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
