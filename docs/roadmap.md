@@ -275,3 +275,17 @@ e cada uma mudou o próximo passo:
   (um dos casos historicamente fortes). Resultado 0/10 não é comparável ao 2/15 anterior;
   descartado. Corrigido e relançado com `--limit 15` explícito
   (`e2e-visual-anchor-hardening-v2`).
+- [x] **Replay v2 (15 posts completos) concluído: 0/15 aprovados.** Antes de concluir que o
+      hardening piorou o funil, inspecionei as avaliações: 7/15 rejeitados por "críticos sem
+      consenso" (os dois críticos aprovam candidatas DIFERENTES na mesma rodada — o padrão de
+      falha histórico, já visto em 2026-07-09 antes de qualquer hardening novo), e só **1
+      avaliação em toda a rodada** bateu no teto novo de ancoragem visual (`visual_payoff=4`,
+      post "Unexpected", motivo "punchline não está relacionada à cena" — caso correto, não
+      falso positivo). O caso "employee of the month" (que já tinha sido aprovado com
+      consenso antes) teve candidatas com scores altos dos dois críticos individualmente
+      (llama3 aprovou a candidata 3 com 8/9/9/8/8; qwen2.5vl aprovou a candidata 5 com
+      8/9/10/10/9) mas SEM consenso entre eles sobre qual candidata — não foi penalizado pela
+      regra de ancoragem visual. **Conclusão**: 0/15 está dentro da variância já observada
+      antes do hardening (0/15, 0/15, 1/15, 2/15 em replays anteriores do mesmo lote); não há
+      evidência de que a rubrica nova tenha reintroduzido falsos negativos. O gargalo
+      dominante continua sendo consenso entre os dois críticos, não a rubrica de ancoragem.
