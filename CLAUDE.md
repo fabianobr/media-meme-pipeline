@@ -8,6 +8,14 @@ A local pipeline that turns public Reddit posts into short video memes: Reddit R
 
 This repository is public. Never commit generated media, `data/media-pipeline/`, `.env` files, tokens, Telegram IDs, model files, or run payloads. `HF_TOKEN` is read only from the environment. Run `./scripts/check_public_ready.sh` before publishing changes.
 
+**Keep `docs/roadmap.md` and `CHANGELOG.md` current.** `docs/roadmap.md` is the living
+project log — overall plan, empirical findings that forced plan changes, and current status;
+update it after every significant finding or decision, not just at the end of a session.
+`CHANGELOG.md` tracks functional changes (Keep a Changelog format) — add an entry whenever a
+default, behavior, or workflow graph changes. Read both before assuming a default or fix is
+still current; the roadmap records negative results too (e.g. prompt-based audio pauses were
+tried and measured ineffective — don't re-attempt without re-reading why).
+
 ## Commands
 
 ```bash
