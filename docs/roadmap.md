@@ -268,3 +268,10 @@ e cada uma mudou o próximo passo:
 - [ ] Avaliar se 1-2/15 de aprovação orgânica (taxa observada antes deste hardening) ainda é
       aceitável para uso rotineiro, ou se compensa manter curadoria humana como caminho
       principal e o escritor como gerador de rascunhos.
+- **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
+  erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
+  `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
+  processou só os 10 primeiros dos 15 posts, faltando 5, incluindo o "employee of the month"
+  (um dos casos historicamente fortes). Resultado 0/10 não é comparável ao 2/15 anterior;
+  descartado. Corrigido e relançado com `--limit 15` explícito
+  (`e2e-visual-anchor-hardening-v2`).
