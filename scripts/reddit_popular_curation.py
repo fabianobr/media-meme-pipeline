@@ -99,21 +99,27 @@ def main() -> int:
     seen_ids = set(backlog.get("seen_ids", []))
     approved = backlog.get("approved", [])
 
-    print(f"r/{SUBREDDIT}: fetched {len(parsed_posts)} entries, {len(posts)} usable after filters.")
+    print(f"r/{SUBREDDIT}: fetched {len(parsed_posts)} entries, {len(posts)} usable after filters.", flush=True)
     new_posts = [post for post in posts if post.id not in seen_ids]
-    print(f"New (unseen) posts this run: {len(new_posts)}. Backlog before this run: {len(approved)}/{args.target}.")
+    print(
+        f"New (unseen) posts this run: {len(new_posts)}. Backlog before this run: {len(approved)}/{args.target}.",
+        flush=True,
+    )
 
     skipped_media_type = 0
     evaluated = 0
     approved_this_run = 0
 
-    for post in new_posts:
+    for i, post in enumerate(new_posts, 1):
         if len(approved) >= args.target:
-            print(f"Backlog already at target ({args.target}); stopping before evaluating more posts.")
+            print(f"Backlog already at target ({args.target}); stopping before evaluating more posts.", flush=True)
             break
+        print(f"[{i}/{len(new_posts)}] {post.media_type}: {post.title[:70]}", flush=True)
         if post.media_type != "image":
             skipped_media_type += 1
             seen_ids.add(post.id)
+            backlog["seen_ids"] = sorted(seen_ids)
+            save_backlog(args.backlog_file, backlog)
             continue
 
         args.media_dir.mkdir(parents=True, exist_ok=True)
@@ -121,6 +127,8 @@ def main() -> int:
         media_path = pipeline.download_source_media(post, args.media_dir / f"{post.rank:02d}-{slug}-source")
         if not media_path:
             seen_ids.add(post.id)
+            backlog["seen_ids"] = sorted(seen_ids)
+            save_backlog(args.backlog_file, backlog)
             continue
 
         description = pipeline.describe_source_image(Path(media_path), args.vision_model, args.vision_timeout)
@@ -130,7 +138,7 @@ def main() -> int:
         )
         seen_ids.add(post.id)
         status_word = "approved" if review.get("approved") else "rejected"
-        print(f"  {status_word}: {post.title[:70]} - {review.get('reason', '')[:120]}")
+        print(f"  {status_word}: {review.get('reason', '')[:120]}", flush=True)
 
         if review.get("approved"):
             approved.append(
@@ -144,19 +152,25 @@ def main() -> int:
             )
             approved_this_run += 1
 
-    backlog["approved"] = approved
-    backlog["seen_ids"] = sorted(seen_ids)
-    save_backlog(args.backlog_file, backlog)
+        # Save after every evaluated post, not just at the end: vision-model calls are slow
+        # (each image needs two Ollama round-trips) and a run can be interrupted or time out
+        # partway through — losing unsaved progress means redoing those calls for nothing.
+        backlog["approved"] = approved
+        backlog["seen_ids"] = sorted(seen_ids)
+        save_backlog(args.backlog_file, backlog)
 
-    print()
+    print(flush=True)
     print(
         f"Evaluated {evaluated} image posts this run ({skipped_media_type} video/text posts skipped, "
-        "not eligible until the render engine supports non-image sources)."
+        "not eligible until the render engine supports non-image sources).",
+        flush=True,
     )
-    print(f"Approved this run: {approved_this_run}. Backlog total: {len(approved)}/{args.target}.")
+    print(f"Approved this run: {approved_this_run}. Backlog total: {len(approved)}/{args.target}.", flush=True)
     if len(approved) < args.target:
-        print(f"Run again later (e.g. daily) to accumulate the remaining {args.target - len(approved)}.")
-    print(f"Backlog file: {args.backlog_file}")
+        print(
+            f"Run again later (e.g. daily) to accumulate the remaining {args.target - len(approved)}.", flush=True
+        )
+    print(f"Backlog file: {args.backlog_file}", flush=True)
     return 0
 
 

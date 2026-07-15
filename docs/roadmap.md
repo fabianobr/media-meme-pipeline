@@ -289,6 +289,13 @@ e cada uma mudou o próximo passo:
       como "vistos" mas nunca chamam o modelo de visão. 2 testes novos
       (`PopularCurationBacklogTests`): posts de vídeo/texto não chamam o modelo; posts já
       vistos não são reavaliados numa segunda chamada. Suíte total: 30 passed.
+- **Bug pego na primeira execução real**: rodei com `timeout 900` e sem `-u`; o processo
+  bateu o timeout (exit 124) SEM imprimir nada (stdout bufferizado, `timeout`/SIGTERM não
+  flusha o buffer) E sem salvar nada (o backlog só era gravado uma vez no final) — toda a
+  janela de ~15 min processando imagens foi perdida sem deixar rastro. Corrigido: salvar o
+  backlog a cada post avaliado (não só ao final) e `flush=True` em todo print de progresso.
+  Lição: em qualquer script novo de longa duração, checkpoint incremental + stdout sem buffer
+  não são opcionais — sem isso um timeout ou kill perde trabalho de forma silenciosa.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
