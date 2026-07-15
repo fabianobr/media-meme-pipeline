@@ -306,6 +306,23 @@ e cada uma mudou o próximo passo:
       corretamente em `data/media-pipeline/popular-curated-backlog.json`. Faltam 14 pra
       fechar 20 — rodar `scripts/reddit_popular_curation.py --target 20` de novo mais tarde
       (o feed muda com o tempo; rodar de novo agora tende a repetir os mesmos 25 já vistos).
+- **Achado que mudou o plano**: o feed RSS do Reddit aceita `?limit=` — testado ao vivo,
+  `?limit=100` devolve 100 entradas (vs. 25 do default que o código usava), `?limit=250+`
+  dá 429 (rate limit; 100 é o teto real do endpoint, documentado pela própria API do Reddit,
+  não um bug nosso). Corrigido: `feed_url`/`fetch_feed_once`/`fetch_feed` ganharam parâmetro
+  `limit` (default 100), exposto como `--rss-limit` nos dois scripts. Isso muda a estratégia:
+  não é mais necessário espalhar a curadoria por cron/múltiplos dias — um lote de ~100
+  entradas por busca já tem material suficiente pra fechar 20 aprovados em poucas execuções
+  seguidas no mesmo dia.
+- [x] **Backlog fechado: 20/20 aprovados**, em 3 execuções seguidas do mesmo lote de 98
+      entradas (buscado uma vez com `?limit=100`; execuções seguintes só continuaram
+      avaliando os posts ainda não vistos daquele mesmo lote, sem buscar de novo). Duas delas
+      bateram no timeout de 25 min (cada avaliação de imagem leva ~30-40s: descrição de
+      visão + gate de fonte, dois round-trips ao Ollama) mas o checkpoint incremental
+      preservou o progresso todas as vezes — sem perder trabalho. Taxa de aprovação final:
+      20/~60 imagens avaliadas (~33%), consistente com a taxa observada no primeiro teste
+      (27%). Lista completa dos 20 títulos aprovados em
+      `data/media-pipeline/popular-curated-backlog.json`.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
