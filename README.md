@@ -129,6 +129,27 @@ python3 scripts/reddit_meme_dry_run.py \
   --cache-on-failure
 ```
 
+## Curadoria de Backlog do r/popular
+
+`r/popular` é a fonte fixa de posts (decisão de produto), mas seu RSS devolve só ~25 entradas
+por busca, sem paginação, e mistura imagem/vídeo/texto — a maioria não passa no gate de fonte
+(screenshots, placares, conteúdo dependente de texto). `scripts/reddit_popular_curation.py`
+resolve isso com curadoria progressiva: cada execução busca o feed atual, pula posts já
+avaliados (aprovados ou rejeitados) em execuções anteriores, roda os posts de imagem novos
+pela mesma descrição de visão + gate de fonte do pipeline principal, e acumula aprovados num
+backlog persistente até atingir `--target` (default 20). Rode repetidamente (ex.: diário) até
+o backlog fechar:
+
+```bash
+python3 scripts/reddit_popular_curation.py --target 20
+```
+
+Posts de vídeo e texto são pulados, não avaliados: o motor de render é I2V (imagem→vídeo), sem
+caminho hoje para gerar vídeo-meme a partir de vídeo ou texto-fonte. O backlog fica em
+`data/media-pipeline/popular-curated-backlog.json` (gitignored); cada entrada aprovada
+carrega o post, o caminho da mídia baixada, a descrição visual e a revisão do gate de fonte,
+prontos para alimentar `--concepts-file`/`--approved-concepts-file` do pipeline principal.
+
 ## Pipeline Sem Render
 
 Gera seleção, descrições/conceitos e resumo, mas não chama ComfyUI:

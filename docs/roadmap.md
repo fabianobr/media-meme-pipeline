@@ -268,6 +268,27 @@ e cada uma mudou o próximo passo:
 - [ ] Avaliar se 1-2/15 de aprovação orgânica (taxa observada antes deste hardening) ainda é
       aceitável para uso rotineiro, ou se compensa manter curadoria humana como caminho
       principal e o escritor como gerador de rascunhos.
+- **Decisão do usuário (2026-07-15): `r/popular` vira fonte fixa, não-negociável**, revertendo
+  a preferência anterior por subreddits visuais (que tinham ~40-47% de aprovação no gate de
+  fonte vs. 0/10 do `r/popular` testado em 2026-07-08). Em vez de rodar o funil inteiro num
+  lote fixo e descartar o que reprovar, a abordagem agora é curadoria progressiva: avaliar
+  cada post do `r/popular`, pular o que não bate o mínimo, e acumular um backlog de 20
+  aprovados ao longo de várias execuções — não numa única chamada.
+- **Dois obstáculos técnicos confirmados antes de implementar**: (1) o RSS de `r/popular`
+  devolve só 25 entradas por busca, sem paginação implementada — uma amostra ao vivo rendeu
+  13 imagem / 9 vídeo / 3 texto; (2) o gate de fonte (`assess_source_suitability`) só aceita
+  `media_type == "image"` hoje — vídeo/texto são auto-rejeitados porque o motor de render é
+  I2V (imagem→vídeo), sem caminho pra outros tipos de mídia. Usuário decidiu: pular vídeo/texto
+  por enquanto (não investir em extrair frame de vídeo agora) e acumular o backlog entre
+  execuções (não implementar paginação do RSS agora).
+- [x] **Novo script `scripts/reddit_popular_curation.py`**: busca o feed de `r/popular`,
+      pula posts já vistos (aprovados OU rejeitados) em execuções anteriores via um arquivo
+      de backlog persistente (`data/media-pipeline/popular-curated-backlog.json`, gitignored),
+      avalia só posts de imagem novos com a mesma descrição de visão + gate de fonte do
+      pipeline principal, e acumula aprovados até `--target` (default 20). Vídeo/texto contam
+      como "vistos" mas nunca chamam o modelo de visão. 2 testes novos
+      (`PopularCurationBacklogTests`): posts de vídeo/texto não chamam o modelo; posts já
+      vistos não são reavaliados numa segunda chamada. Suíte total: 30 passed.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —

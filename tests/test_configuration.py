@@ -13,6 +13,8 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import daily_reddit_meme_pipeline as pipeline  # noqa: E402
+import reddit_meme_dry_run as reddit  # noqa: E402
+import reddit_popular_curation as curation  # noqa: E402
 
 
 class ServiceUrlTests(unittest.TestCase):
@@ -346,6 +348,74 @@ class SourceSuitabilityTests(unittest.TestCase):
             "reason": "clear action",
         })
         self.assertTrue(review["approved"])
+
+
+class PopularCurationBacklogTests(unittest.TestCase):
+    def _post(self, post_id: str, media_type: str, rank: int) -> reddit.RedditPost:
+        return reddit.RedditPost(
+            subreddit="popular",
+            id=post_id,
+            title=f"title {post_id}",
+            author="someone",
+            url="https://reddit.com/x",
+            updated="2026-07-15T00:00:00+00:00",
+            summary="",
+            rank=rank,
+            media_type=media_type,
+            media_url="https://i.redd.it/x.jpg" if media_type == "image" else "https://v.redd.it/x",
+        )
+
+    def test_video_and_text_posts_are_skipped_without_calling_the_vision_model(self) -> None:
+        posts = [self._post("v1", "video", 1), self._post("t1", "text", 2)]
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(reddit, "fetch_feed", return_value=(200, "<feed/>", {}, [])), \
+                 patch.object(reddit, "parse_feed", return_value=posts), \
+                 patch.object(reddit, "filter_posts", return_value=posts), \
+                 patch.object(pipeline, "describe_source_image") as mock_describe, \
+                 patch.object(pipeline, "assess_source_suitability") as mock_assess, \
+                 patch("sys.argv", ["reddit_popular_curation.py"] + [
+                     "--backlog-file", f"{tmp}/backlog.json", "--media-dir", tmp,
+                 ]):
+                curation.main()
+            mock_describe.assert_not_called()
+            mock_assess.assert_not_called()
+            backlog = curation.load_backlog(Path(f"{tmp}/backlog.json"))
+            self.assertEqual(backlog["seen_ids"], ["t1", "v1"])
+            self.assertEqual(backlog["approved"], [])
+
+    def test_approved_image_post_is_added_and_already_seen_ids_are_not_reevaluated(self) -> None:
+        post = self._post("i1", "image", 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            argv = ["reddit_popular_curation.py", "--backlog-file", f"{tmp}/backlog.json", "--media-dir", tmp]
+            with patch.object(reddit, "fetch_feed", return_value=(200, "<feed/>", {}, [])), \
+                 patch.object(reddit, "parse_feed", return_value=[post]), \
+                 patch.object(reddit, "filter_posts", return_value=[post]), \
+                 patch.object(pipeline, "download_source_media", return_value="/tmp/i1.jpg"), \
+                 patch.object(pipeline, "describe_source_image", return_value="a cat"), \
+                 patch.object(
+                     pipeline,
+                     "assess_source_suitability",
+                     return_value={"approved": True, "scores": {}, "reason": "ok"},
+                 ) as mock_assess, \
+                 patch("sys.argv", argv):
+                curation.main()
+            self.assertEqual(mock_assess.call_count, 1)
+            backlog = curation.load_backlog(Path(f"{tmp}/backlog.json"))
+            self.assertEqual(len(backlog["approved"]), 1)
+            self.assertEqual(backlog["seen_ids"], ["i1"])
+
+            # Second run: same post must not be re-evaluated (already seen).
+            with patch.object(reddit, "fetch_feed", return_value=(200, "<feed/>", {}, [])), \
+                 patch.object(reddit, "parse_feed", return_value=[post]), \
+                 patch.object(reddit, "filter_posts", return_value=[post]), \
+                 patch.object(pipeline, "download_source_media") as mock_download, \
+                 patch.object(pipeline, "assess_source_suitability") as mock_assess_again, \
+                 patch("sys.argv", argv):
+                curation.main()
+            mock_download.assert_not_called()
+            mock_assess_again.assert_not_called()
+            backlog = curation.load_backlog(Path(f"{tmp}/backlog.json"))
+            self.assertEqual(len(backlog["approved"]), 1)
 
 
 class ConceptSchemaTests(unittest.TestCase):
