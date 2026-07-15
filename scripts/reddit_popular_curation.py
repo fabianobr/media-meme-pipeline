@@ -61,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-age-hours", type=int, default=72)
     parser.add_argument("--include-automoderator", action="store_true")
     parser.add_argument("--timeout", type=int, default=20, help="HTTP timeout in seconds for the RSS fetch.")
+    parser.add_argument(
+        "--rss-limit",
+        type=int,
+        default=100,
+        help="Entries requested per RSS fetch via ?limit= (Reddit's own ceiling is 100; higher gets rate-limited).",
+    )
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--backoff-base", type=float, default=5.0)
     parser.add_argument("--backoff-max", type=float, default=120.0)
@@ -82,6 +88,7 @@ def main() -> int:
         backoff_base=args.backoff_base,
         backoff_max=args.backoff_max,
         jitter=args.jitter,
+        limit=args.rss_limit,
     )
     if status != 200:
         print(f"ERROR could not fetch r/{SUBREDDIT}: status={status} attempts=[{'; '.join(attempts)}]")

@@ -85,8 +85,10 @@ def extract_media_url(raw_html: str, fallback_url: str) -> tuple[str, str]:
     return "text", ""
 
 
-def feed_url(subreddit: str) -> str:
-    return f"https://www.reddit.com/r/{urllib.parse.quote(subreddit)}/.rss"
+def feed_url(subreddit: str, limit: int = 100) -> str:
+    # Reddit's RSS defaults to a 25-entry page; ?limit= raises that up to Reddit's own
+    # documented ceiling of 100 for listings (confirmed live: 100 works, 250+ gets rate-limited).
+    return f"https://www.reddit.com/r/{urllib.parse.quote(subreddit)}/.rss?limit={limit}"
 
 
 def cache_path(cache_dir: Path, subreddit: str) -> Path:
@@ -107,9 +109,9 @@ def should_retry(status: int | None) -> bool:
     return status is None or status == 429 or 500 <= status <= 599
 
 
-def fetch_feed_once(subreddit: str, timeout: int) -> tuple[int | None, str, dict[str, str]]:
+def fetch_feed_once(subreddit: str, timeout: int, limit: int = 100) -> tuple[int | None, str, dict[str, str]]:
     request = urllib.request.Request(
-        feed_url(subreddit),
+        feed_url(subreddit, limit=limit),
         headers={
             "User-Agent": "Mozilla/5.0 media-meme-pipeline-reddit-rss-dry-run/0.2",
             "Accept": "application/atom+xml,application/rss+xml,text/xml;q=0.9,*/*;q=0.5",
@@ -131,6 +133,7 @@ def fetch_feed(
     backoff_base: float,
     backoff_max: float,
     jitter: float,
+    limit: int = 100,
 ) -> tuple[int | None, str, dict[str, str], list[str]]:
     attempts: list[str] = []
     max_attempts = max(1, retries + 1)
@@ -139,7 +142,7 @@ def fetch_feed(
     last_headers: dict[str, str] = {}
 
     for attempt in range(1, max_attempts + 1):
-        status, body, headers = fetch_feed_once(subreddit, timeout=timeout)
+        status, body, headers = fetch_feed_once(subreddit, timeout=timeout, limit=limit)
         last_status, last_body, last_headers = status, body, headers
         attempts.append(f"attempt={attempt} status={status}")
 
@@ -279,6 +282,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Dry-run Reddit RSS meme candidate selector.")
     parser.add_argument("--subreddit", action="append", dest="subreddits", help="Subreddit to read. Repeatable.")
     parser.add_argument("--limit", type=int, default=10, help="Number of candidates to select.")
+    parser.add_argument(
+        "--rss-limit",
+        type=int,
+        default=100,
+        help="Entries requested per RSS fetch via ?limit= (Reddit's own ceiling is 100; higher gets rate-limited).",
+    )
     parser.add_argument("--max-per-subreddit", type=int, default=3, help="Diversity cap before fallback fill.")
     parser.add_argument("--delay", type=float, default=2.0, help="Delay between Reddit feed requests.")
     parser.add_argument("--timeout", type=int, default=20, help="HTTP timeout in seconds.")
@@ -324,6 +333,7 @@ def main() -> int:
             backoff_base=args.backoff_base,
             backoff_max=args.backoff_max,
             jitter=args.jitter,
+            limit=args.rss_limit,
         )
         source = "live"
         if status != 200:
