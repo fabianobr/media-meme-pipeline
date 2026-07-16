@@ -363,6 +363,11 @@ e cada uma mudou o próximo passo:
       livre) — segunda tentativa rodou de ponta a ponta sem erro. Ambos os vídeos passaram
       nas duas verificações (Whisper: texto completo, sem corte; `silencedetect`: ~2s de
       pausa final real nos dois) e foram entregues ao usuário.
+- [ ] **Segunda rodada do funil nos 18 posts rejeitados** (usuário mandou seguir sem pausa
+      pra decidir): amostra estocástica nova do escritor (`qwen3:14b`, mesmos posts, mesmo
+      gate de fonte) pode aprovar diferente do que a primeira rodada, como já visto no caso
+      "employee of the month" (rejeitado numa amostra, aprovado de primeira noutra). Rodando
+      em `data/media-pipeline/popular-humor-funnel-retry/`.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
