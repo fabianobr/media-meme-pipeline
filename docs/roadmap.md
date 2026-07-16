@@ -411,6 +411,16 @@ e cada uma mudou o próximo passo:
   robustas são existência/identidade de objetos e ações, não comparações visuais. Tentativa
   2/2 (dentro do critério de autonomia): imagem e vídeo apagados, re-render com nova amostra
   da imagem-base; se divergir de novo, descarte.
+- [x] **Tentativa 2/2 divergiu de novo (TV grande, gato espúrio pela 2ª vez, pseudo-texto num
+      copo) → conceito hotel/TV descartado**, conforme o critério de 2 tentativas. A âncora
+      de tamanho relativo não sobrevive à amostragem da imagem-base — confirma a lição acima
+      com N=2.
+- **Fechamento do ciclo dos 20 posts curados do `r/popular`**: 4 aprovações brutas do funil
+  em 2 passadas (2+2), 2 descartes na revisão/produção (fonte dependente de legenda;
+  âncora visual frágil), **2 vídeos finais entregues** (Birdie, gato de feltro corrigido).
+  Rendimento líquido: 2/20 posts curados viraram vídeo aprovável (10%), com 3 modos de falha
+  distintos documentados no caminho (texto incoerente corrigível, fonte estruturalmente
+  inadequada, âncora visual não-preservada pela geração).
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
