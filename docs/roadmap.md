@@ -493,6 +493,24 @@ e cada uma mudou o próximo passo:
   **Correção de processo: inspeção da imagem-base é etapa obrigatória de verificação antes
   de entregar, no mesmo nível de Whisper e silencedetect.** Retry dos 3 em andamento com
   amostragem nova.
+- [x] **Retry com inspeção: Birdie e gato de feltro aprovados na verificação completa e
+      reentregues.** Birdie melhorou visivelmente (cão de fato usando o equipamento de rodas,
+      movimento real de sujeito nos frames). Gato de feltro coerente com ressalva menor
+      reportada (fala diz "mesa de madeira", cena mostra barra/poleiro de madeira).
+- [x] **Lobo descartado** pelo critério de 2 tentativas: o resample trocou a espécie DE NOVO
+      (gato rosnando, 4ª ocorrência do prior felino) e as âncoras degradaram (sem armadilha
+      prendendo o animal, sem vara de resgate — "recusa ajuda" ficou sem suporte visual).
+      Detalhe importante: o prompt de cena dizia "Um lobo" explicitamente, duas vezes, em
+      português — e o modelo de imagem gerou felino mesmo assim. Hipótese para investigação
+      futura: a descrição visual embutida no image_prompt está em português; termos de
+      espécie em inglês ("gray wolf") no prompt (que a regra do projeto já diz que deve ser
+      em inglês) provavelmente pesariam mais que "lobo". Candidato a fix em
+      `compose_image_prompt`/`build_video_script`: traduzir ou duplicar a espécie/aparência
+      do sujeito em inglês explícito quando a identidade importar.
+- **Saldo do dia após o retry**: 2 vídeos válidos do ciclo r/popular reentregues com o
+  processo de verificação completo (Birdie, gato de feltro); 2 conceitos descartados com
+  critério (hotel/TV: âncora de tamanho; lobo: identidade de espécie). O funil de produção
+  segue operacional; próxima matéria-prima quando o feed rodar.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
