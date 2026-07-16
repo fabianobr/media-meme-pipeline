@@ -477,6 +477,22 @@ e cada uma mudou o próximo passo:
   render 2: cabeça de gato; lobo: espécie trocada pra felino laranja). O modelo de imagem tem
   um prior forte nessa direção — considerar mencionar explicitamente a espécie/aparência no
   image_prompt quando a identidade do animal importar.
+- **Veredito do usuário nos 3 vídeos do dia: qualidade muito pior, "parece apresentação de
+  foto parada mudando de ângulo" — volta atrás/retry.** Investigação sistemática antes de
+  re-renderizar, hipóteses testadas em ordem: (1) resolução da imagem-base — FALSIFICADA
+  (768×768 idêntico entre aprovados e novos); (2) movimento medido por diff de pixels —
+  invertido: os novos têm MAIS mudança global (53-86% vs 17-34% dos aprovados), consistente
+  com câmera derivando sobre cena estática em vez de sujeito animado; (3) video_script/prompt
+  — idênticos em estrutura; (4) seed — aleatório por tempo em todos, não é revertível.
+  **Causa raiz real: processo, não código.** Os vídeos aprovados (cavalo, galáxia) usavam
+  imagens-base FIXADAS que haviam passado por vetting humano; os 3 novos renderizaram
+  imagens-base recém-geradas sem ninguém olhar (Birdie: cão pulando na coleira SEM usar o
+  equipamento de rodas — âncora da piada falsa na cena; gato de feltro: composição surreal
+  com prancha flutuante e tablet aleatório; lobo: espécie trocada). Eu verifiquei áudio e
+  pacing dos 3, mas só inspecionei imagem do lobo — pulei a inspeção visual de 2 dos 3.
+  **Correção de processo: inspeção da imagem-base é etapa obrigatória de verificação antes
+  de entregar, no mesmo nível de Whisper e silencedetect.** Retry dos 3 em andamento com
+  amostragem nova.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
