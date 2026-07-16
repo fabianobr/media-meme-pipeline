@@ -451,6 +451,21 @@ e cada uma mudou o próximo passo:
       disparou em produção (rejeição do post do Zelensky com o motivo determinístico "texto
       embutido carrega o significado do post"). Backlog acumulado: 29. Funil de humor rodando
       nos 9 novos, agora protegido pelo checkpoint incremental.
+- **Ambiente de background voltou a matar processos (3 kills seguidos no funil do ciclo 2)**.
+  Mudança de arquitetura de execução, combinando as duas lições da sessão: o trabalho real
+  roda como **processo desacoplado** (`setsid nohup`, imune à reciclagem do ambiente; log em
+  arquivo estável) e a notificação fica com um **Monitor nativo do harness** que cobre os
+  dois estados terminais (conclusão via EXIT_CODE no log, OU processo morto sem terminar) —
+  sem waiter próprio, que era a parte frágil do padrão antigo. Funcionou de primeira: funil
+  completou de ponta a ponta na 1ª execução desacoplada.
+- [x] **Funil do ciclo 2: 1/9 aprovado** ("Respect for this guy. Saved a wolf from a trap...").
+      O gate endurecido re-avaliou na entrada e rejeitou 4 dos 9 que a curadoria (gate antigo)
+      tinha aprovado — filtro mais rígido agindo como esperado. O texto aprovado tinha
+      problemas claros de PT-BR ("LÓBO", "TRAPAÇA" como falso cognato de trap, "CAMPESINATO"
+      deslocado) e punchline descritiva. Reescrito (tentativa 1/2) ancorado na cena real
+      (lobo com corrente na pata rosnando pra vara de resgate): "PRESO NA ARMADILHA, ELE
+      ROSNA. RECUSA AJUDA COM ESTILO. CLIENTE DIFÍCIL ATÉ NO RESGATE." (14 palavras → 225
+      quadros/9s). Render em andamento.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
