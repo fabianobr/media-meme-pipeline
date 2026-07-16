@@ -392,6 +392,16 @@ e cada uma mudou o próximo passo:
   passou. **Descartado** — não é um problema de texto corrigível por reescrita, é a mídia-fonte
   que não serve. A do hotel/TV está ancorada na cena real, sem esse problema — segue para
   render como está.
+- [x] **Lote B concluído: 0/9.** Fechamento da retentativa nos 18 rejeitados: 2/18 aprovados
+      pelo funil, 1 descartado (defeito estrutural de fonte), 1 seguiu adiante. Total das
+      duas passadas nos 20 curados: 4 aprovações brutas do funil (2+2), 3 conceitos úteis
+      após revisão (Birdie, gato de feltro corrigido, hotel/TV corrigido).
+- **Correção de texto no hotel/TV (tentativa 1/2, dentro da autonomia concedida)**: o texto
+  aprovado ("ERA SÓ UMA TAREFA / MAS O FUTEBOL SE TORNOU UM DEUS / AGORA EU SOU O REI DA
+  TELA") tinha o mesmo defeito do gato+galáxia — abstrações sem âncora na cena. Reescrito
+  ancorado no visível: **"SEMIFINAL DA COPA NO HOTEL. A TV É MENOR QUE O QUADRO NA PAREDE.
+  MAS HOJE ELA É O MAIOR TELÃO DO MUNDO."** (23 palavras → 249 quadros/9,96s, faixa já
+  comprovada). Render em andamento em `data/media-pipeline/popular-render-batch2/`.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
