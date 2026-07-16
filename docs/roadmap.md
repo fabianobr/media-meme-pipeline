@@ -526,6 +526,14 @@ e cada uma mudou o próximo passo:
   avança no carrinho de rodas, cauda abanando; feltro: mão entra em quadro e faz carinho, o
   gato NÃO reage — movimento que ainda reforça a piada) e câmera estática (sem push-in).
   Teste de variável única em andamento (mesmas imagens-base, só o spec de movimento mudou).
+- [x] **Teste de movimento validado nos frames e entregue**: com ação explícita no
+      `timeline`/`character`, o Birdie ganhou movimento real de sujeito (cão muda de postura,
+      sobe no carrinho, mulher caminha) e o gato de feltro ganhou um evento em cena (mão
+      entra, faz carinho, sai — gato imóvel, reforçando a piada). Áudio verbatim e pausas ok
+      nos dois. **Se o usuário aprovar, o fix estrutural é fazer `build_video_script` gerar
+      timeline/character com ação específica da cena (derivada da descrição visual) em vez do
+      template genérico "fixed stare / blinks once / minimal motion"** — o template só
+      funciona por acaso em close de rosto.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
