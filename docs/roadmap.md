@@ -511,6 +511,21 @@ e cada uma mudou o próximo passo:
   processo de verificação completo (Birdie, gato de feltro); 2 conceitos descartados com
   critério (hotel/TV: âncora de tamanho; lobo: identidade de espécie). O funil de produção
   segue operacional; próxima matéria-prima quando o feed rodar.
+- **Usuário reprovou também as versões do retry ("continua imagem congelada com movimento de
+  câmera; antes estava bem melhor") — meu diagnóstico anterior estava incompleto.** O vetting
+  da imagem-base era necessário mas não suficiente. Investigação nova, com diff do prompt
+  LTX compilado (função é determinística, reconstruída localmente para aprovado vs
+  reprovado): os prompts são estruturalmente IDÊNTICOS, incluindo "minimal motion" e "very
+  slow push-in" — o template genérico de `build_video_script` ("fixed stare, blinks once,
+  tiny ear twitch") vale pra todos. **Diagnóstico refinado: os aprovados (cavalo, galáxia)
+  eram close/medium de um rosto, onde o modelo de A/V nativo anima piscada/boca junto com o
+  voice-over — movimento de sujeito perceptível de graça; os novos são cenas abertas (praia,
+  poleiro), onde o mesmo template só rende deriva de câmera → sensação de foto animada.**
+  Alavanca identificada sem tocar código: `timeline[0]` e `character` do video_script são
+  DADOS que entram direto no prompt — reescritos com ação explícita de sujeito (Birdie: cão
+  avança no carrinho de rodas, cauda abanando; feltro: mão entra em quadro e faz carinho, o
+  gato NÃO reage — movimento que ainda reforça a piada) e câmera estática (sem push-in).
+  Teste de variável única em andamento (mesmas imagens-base, só o spec de movimento mudou).
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
