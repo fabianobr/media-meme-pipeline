@@ -402,6 +402,15 @@ e cada uma mudou o próximo passo:
   ancorado no visível: **"SEMIFINAL DA COPA NO HOTEL. A TV É MENOR QUE O QUADRO NA PAREDE.
   MAS HOJE ELA É O MAIOR TELÃO DO MUNDO."** (23 palavras → 249 quadros/9,96s, faixa já
   comprovada). Render em andamento em `data/media-pipeline/popular-render-batch2/`.
+- **Modo de falha novo encontrado no 1º render do hotel/TV**: áudio e pacing perfeitos
+  (Whisper: texto completo; 1,2s de pausa final), mas a imagem-base gerada divergiu da
+  cena-fonte — inventou um gato, fez a TV GRANDE (a fala diz "a TV é menor que o quadro",
+  falso na cena renderizada) e pôs pseudo-texto na tela. **Lição: piada ancorada em relação
+  espacial/tamanho relativo ("menor que o quadro") é frágil — a geração estocástica da
+  imagem-base preserva presença de objetos, não relações de tamanho entre eles.** Âncoras
+  robustas são existência/identidade de objetos e ações, não comparações visuais. Tentativa
+  2/2 (dentro do critério de autonomia): imagem e vídeo apagados, re-render com nova amostra
+  da imagem-base; se divergir de novo, descarte.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
