@@ -466,6 +466,17 @@ e cada uma mudou o próximo passo:
       (lobo com corrente na pata rosnando pra vara de resgate): "PRESO NA ARMADILHA, ELE
       ROSNA. RECUSA AJUDA COM ESTILO. CLIENTE DIFÍCIL ATÉ NO RESGATE." (14 palavras → 225
       quadros/9s). Render em andamento.
+- [x] **Render do lobo verificado e entregue** (whisper verbatim; fala até 7,3s, 1,69s de
+      pausa final; cena coerente com a fala). Ressalva reportada ao usuário: a geração trocou
+      a espécie (lobo → animal alaranjado tipo gato). Como a reescrita não nomeia a espécie
+      ("ELE rosna"), o vídeo fica internamente coerente — mais uma confirmação da lição de
+      ancoragem: identidade de espécie também é âncora frágil; o que sobrevive de forma
+      confiável é ação+objeto (animal preso rosnando pra vara), não a taxonomia.
+- **Padrão empírico recorrente: gato laranja espontâneo.** 3ª ocorrência de gato/animal
+  alaranjado aparecendo sem ser pedido na imagem-base (hotel/TV render 1: gato inteiro;
+  render 2: cabeça de gato; lobo: espécie trocada pra felino laranja). O modelo de imagem tem
+  um prior forte nessa direção — considerar mencionar explicitamente a espécie/aparência no
+  image_prompt quando a identidade do animal importar.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
