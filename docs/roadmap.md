@@ -17,17 +17,17 @@ sustenta uma piada sem inventar elementos?) → (3) geração de humor por um es
 por dois modelos independentes → (4) imagem-base limpa + roteiro de vídeo → (5) render LTX
 2.3 nativo I2V com áudio + revisão humana.
 
-## Estado atual (2026-07-12)
+## Estado atual (2026-07-16)
 
 | Estágio | Situação |
 |---|---|
-| 1. Seleção de posts | Estável. RSS do Reddit, dry-run disponível. |
-| 2. Gate de fonte | Estável. Scores coerentes; r/popular rende pouca matéria-prima visual (dependência de texto); subreddits de fotos/animais rendem ~40-47% de aprovação. |
-| 3. Humor (escritor + críticos) | **Em calibração ativa, dois modos de falha mapeados.** Taxa de aprovação orgânica: 0/15 → 0/15 → 1/15 → 2/15 nos últimos 4 replays dos mesmos posts congelados. Falso negativo (crítico cego à imagem subestima piada boa) corrigido com crítico de visão. Falso positivo (crítico aprova com score alto uma virada incoerente com a cena) ainda não corrigido estruturalmente — mitigado caso a caso com revisão humana do texto antes de renderizar. |
-| 4. Imagem-base + roteiro | Estável, reaproveitado das runs anteriores sem retrabalho. |
-| 5. Render de vídeo (LTX 2.3) | **Resolvido tecnicamente.** Grafo oficial (`workflows/05`) validado; aprovado pelo usuário em 5 s, 8 s e 10,3 s (2 segmentos), e agora também em 9 s / 9,96 s para diálogos mais longos. |
-| Pacing do áudio (corte no meio da fala) | **Resolvido.** Causa raiz: duração insuficiente para a contagem de palavras do diálogo, não o modelo ignorando o texto (confirmado por Whisper). Calibração por tentativa+verificação (Whisper + silencedetect) converge em poucas rodadas; ainda não é uma fórmula fechada. |
-| Render em posts frescos (fora do Gerald) | **Feito para os 2 conceitos aprovados na run e2e de 2026-07-11.** Cavalo+gato aprovado pelo usuário no áudio/vídeo/pacing. Gato+projetor de galáxia teve o texto reescrito em colaboração com o usuário (piada original fazia sentido zero fora da cena) e o resultado final também foi confirmado ok. |
+| 1. Seleção de posts | Estável. `r/popular` como fonte fixa (decisão de produto), RSS com `?limit=100`, curadoria progressiva com backlog persistente (`scripts/reddit_popular_curation.py`). |
+| 2. Gate de fonte | **Endurecido e validado.** Booleanos explícitos no schema + tetos determinísticos no código (legenda embutida / colagem → rejeição). Verificado contra a colagem real que escapava e contra imagem boa (sem falso positivo novo). Disparando corretamente em produção. |
+| 3. Humor (escritor + críticos) | **Operacional com revisão obrigatória.** Rendimento orgânico ~10% (2/20 ciclo 1, 1/9 ciclo 2 com gate mais rígido). Revisão de texto pelo Claude antes de render é etapa padrão (critério: até 2 correções, depois descarte). Checkpoint incremental protege lotes contra timeout/kill. |
+| 4. Imagem-base + roteiro | Estável, com limitação mapeada: a geração preserva presença de objetos/ações, não relações de tamanho nem identidade de espécie — piadas devem ancorar no que sobrevive. Prior forte de "gato laranja" observado (3 ocorrências). |
+| 5. Render de vídeo (LTX 2.3) | **Resolvido.** Grafo oficial validado em 5–10,3s; calibração palavras→duração por tentativa+verificação (Whisper + silencedetect) convergindo em 1-2 rodadas. |
+| Execução de runs longas | **Resolvido** (após kills recorrentes do ambiente de background): processo desacoplado (`setsid nohup` + log) vigiado por Monitor nativo do harness cobrindo os dois estados terminais. |
+| Produção | **5 vídeos entregues ao usuário até agora**: cavalo+gato e gato+galáxia (aprovados), Birdie, gato de feltro e resgate do lobo (aguardando veredito). |
 
 Branch: tudo commitado direto em `main`. Commits-chave (mais recente primeiro):
 `b016ddf` (fix token budget do escritor) → `7ef8ce2` (crítico com visão real) →
