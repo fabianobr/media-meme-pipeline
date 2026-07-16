@@ -349,6 +349,27 @@ class SourceSuitabilityTests(unittest.TestCase):
         })
         self.assertTrue(review["approved"])
 
+    def test_embedded_caption_caps_text_independence_deterministically(self) -> None:
+        review = pipeline.finalize_source_suitability_review({
+            "approved": True,
+            "embedded_text_carries_meaning": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "model scored generously despite baked-in caption",
+        })
+        self.assertFalse(review["approved"])
+        self.assertEqual(review["scores"]["text_independence"], 2.0)
+
+    def test_multi_photo_collage_caps_clarity_and_text_independence(self) -> None:
+        review = pipeline.finalize_source_suitability_review({
+            "approved": True,
+            "multi_photo_collage": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "side-by-side comparison",
+        })
+        self.assertFalse(review["approved"])
+        self.assertEqual(review["scores"]["text_independence"], 2.0)
+        self.assertEqual(review["scores"]["visual_clarity"], 3.0)
+
 
 class PopularCurationBacklogTests(unittest.TestCase):
     def _post(self, post_id: str, media_type: str, rank: int) -> reddit.RedditPost:
@@ -416,6 +437,50 @@ class PopularCurationBacklogTests(unittest.TestCase):
             mock_assess_again.assert_not_called()
             backlog = curation.load_backlog(Path(f"{tmp}/backlog.json"))
             self.assertEqual(len(backlog["approved"]), 1)
+
+
+class GenerateConceptsCheckpointTests(unittest.TestCase):
+    def test_checkpoint_called_after_each_post(self) -> None:
+        posts = [
+            reddit.RedditPost(
+                subreddit="test", id="p1", title="title1", author="author1", url="url1",
+                updated="2023-01-01", summary="summary1", rank=1, media_type="image"
+            ),
+            reddit.RedditPost(
+                subreddit="test", id="p2", title="title2", author="author2", url="url2",
+                updated="2023-01-01", summary="summary2", rank=2, media_type="image"
+            )
+        ]
+
+        source_reviews = {
+            "p1": {"approved": False, "scores": {}, "reason": "test rejection"},
+            "p2": {"approved": False, "scores": {}, "reason": "test rejection"}
+        }
+
+        seed_candidates_by_post = {
+            "p1": [{"id": 1}],
+            "p2": [{"id": 1}]
+        }
+
+        checkpoint_calls = []
+
+        def checkpoint_callback(partial_list):
+            checkpoint_calls.append(len(partial_list))
+
+        result = pipeline.generate_concepts(
+            posts=posts,
+            model="unused-model",
+            timeout=5,
+            visual_descriptions={},
+            seed_candidates_by_post=seed_candidates_by_post,
+            source_reviews=source_reviews,
+            checkpoint=checkpoint_callback
+        )
+
+        self.assertEqual(checkpoint_calls, [1, 2])
+        self.assertEqual(len(result), 2)
+        for concept in result:
+            self.assertFalse(concept["humor_approved"])
 
 
 class ConceptSchemaTests(unittest.TestCase):

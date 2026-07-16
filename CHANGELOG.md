@@ -8,6 +8,17 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 ## [Unreleased]
 
 ### Added
+- Checkpoint incremental em `generate_concepts()`: `concepts.json` parcial é persistido após
+  cada conceito concluído (best-effort), eliminando a perda do lote inteiro quando um timeout
+  ou kill interrompe a rodada no meio.
+- Gate de fonte com dois booleanos explícitos no schema (`embedded_text_carries_meaning`,
+  `multi_photo_collage`) e tetos determinísticos em `finalize_source_suitability_review`:
+  legenda embutida que carrega o significado limita `text_independence` a 2; colagem de fotos
+  distintas limita também `visual_clarity` a 3 — ambos abaixo dos mínimos, forçando rejeição.
+- Curadoria progressiva do `r/popular` (`scripts/reddit_popular_curation.py`) com backlog
+  persistente entre execuções, checkpoint incremental e stdout sem buffer.
+- Feed RSS solicitado com `?limit=100` (teto real do Reddit) em vez do default de 25
+  entradas; exposto como `--rss-limit`.
 - Segundo crítico de humor com visão real (`qwen2.5vl:7b` por default): recebe a imagem-fonte
   via base64, não só a descrição textual gerada uma vez no início do funil.
 - Render LTX 2.3 em 2 segmentos (`--ltx23-segments 2`) para vídeos além do teto de memória de

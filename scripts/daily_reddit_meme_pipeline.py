@@ -32,7 +32,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -1583,6 +1583,7 @@ def generate_concepts(
     seed_candidates_by_post: dict[str, list[dict[str, Any]]] | None = None,
     source_reviews: dict[str, dict[str, Any]] | None = None,
     image_paths: dict[str, str] | None = None,
+    checkpoint: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, str]]:
     visual_descriptions = visual_descriptions or {}
     seed_candidates_by_post = seed_candidates_by_post or {}
@@ -1707,6 +1708,8 @@ Posts:
             concept["quality_approved"] = False
             set_stage_state(concept, "source_gate", "rejected", reason)
             normalized.append(concept)
+            if checkpoint:
+                checkpoint(normalized)
             continue
         image_path_str = image_paths.get(post.id)
         concept = improve_humor_concept(
@@ -1726,6 +1729,8 @@ Posts:
         concept["quality_review"] = evaluate_concept_quality(post, concept)
         concept["quality_approved"] = bool((concept.get("quality_review") or {}).get("approved"))
         normalized.append(concept)
+        if checkpoint:
+            checkpoint(normalized)
     return normalized
 
 
@@ -2349,6 +2354,17 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
         name: max(0.0, min(5.0, float(scores.get(name) or 0)))
         for name in ("source_match", "visual_clarity", "motion_potential", "text_independence")
     }
+    reason = str(review.get("reason") or "source suitability review did not justify approval")
+    # Deterministic caps: prompt-level "score at most N" instructions proved unreliable
+    # (the Neymar/Haaland caption collage still scored text_independence=3), so the model
+    # only answers the binary questions and the caps are enforced here.
+    if bool(review.get("embedded_text_carries_meaning")):
+        normalized_scores["text_independence"] = min(normalized_scores["text_independence"], 2.0)
+        reason = "texto embutido carrega o significado do post; " + reason
+    if bool(review.get("multi_photo_collage")):
+        normalized_scores["text_independence"] = min(normalized_scores["text_independence"], 2.0)
+        normalized_scores["visual_clarity"] = min(normalized_scores["visual_clarity"], 3.0)
+        reason = "colagem de fotos distintas nao serve para I2V de cena unica; " + reason
     approved = (
         bool(review.get("approved"))
         and normalized_scores["source_match"] >= 4
@@ -2359,7 +2375,7 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
     return {
         "approved": approved,
         "scores": normalized_scores,
-        "reason": str(review.get("reason") or "source suitability review did not justify approval"),
+        "reason": reason,
     }
 
 
@@ -2374,6 +2390,8 @@ def assess_source_suitability(
         "type": "object",
         "properties": {
             "approved": {"type": "boolean"},
+            "embedded_text_carries_meaning": {"type": "boolean"},
+            "multi_photo_collage": {"type": "boolean"},
             "scores": {
                 "type": "object",
                 "properties": {
@@ -2386,7 +2404,7 @@ def assess_source_suitability(
             },
             "reason": {"type": "string"},
         },
-        "required": ["approved", "scores", "reason"],
+        "required": ["approved", "embedded_text_carries_meaning", "multi_photo_collage", "scores", "reason"],
     }
     try:
         with Image.open(image_path) as image:
@@ -2405,7 +2423,13 @@ Pontue de 0 a 5:
 - text_independence: a premissa pode ser entendida visualmente sem depender de OCR.
 
 Rejeite miniatura que nao mostre a acao do titulo, documento/screenshot dependente de leitura,
-imagem ambigua ou fonte que exigiria inventar personagem, objeto ou local. Responda somente JSON.
+imagem ambigua ou fonte que exigiria inventar personagem, objeto ou local.
+Responda tambem dois campos booleanos obrigatorios, de forma literal:
+- embedded_text_carries_meaning: true se a imagem contem legenda, manchete, tweet ou texto
+  embutido que carrega o significado do post (a piada so faz sentido lendo esse texto).
+- multi_photo_collage: true se a imagem e uma colagem/lado-a-lado de duas ou mais fotos ou
+  pessoas distintas comparadas entre si (I2V anima uma unica cena, nao uma comparacao).
+Responda somente JSON.
 Formato exato: {{"approved": false, "scores": {{"source_match": 0, "visual_clarity": 0,
 "motion_potential": 0, "text_independence": 0}}, "reason": "..."}}
 """.strip()
@@ -3785,6 +3809,13 @@ def main() -> int:
         if args.skip_ollama_concepts:
             concepts = [fallback_concept(post, visual_descriptions.get(post.id, "")) for post in posts]
         else:
+            def checkpoint_partial(partial: list[dict[str, Any]]) -> None:
+                # Best-effort: losing a checkpoint must never abort the batch.
+                try:
+                    persist_concepts(run_dir / "concepts.json", posts, partial)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"WARN concept checkpoint failed (continuing): {exc}")
+
             concepts = generate_concepts(
                 posts,
                 args.ollama_model,
@@ -3796,6 +3827,7 @@ def main() -> int:
                 seed_candidates_by_post=seed_candidates_by_post,
                 source_reviews=source_reviews,
                 image_paths=source_media_paths,
+                checkpoint=checkpoint_partial,
             )
         for concept in concepts:
             approved = bool(concept.get("humor_approved") and concept.get("quality_approved"))

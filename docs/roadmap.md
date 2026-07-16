@@ -421,6 +421,31 @@ e cada uma mudou o próximo passo:
   Rendimento líquido: 2/20 posts curados viraram vídeo aprovável (10%), com 3 modos de falha
   distintos documentados no caminho (texto incoerente corrigível, fonte estruturalmente
   inadequada, âncora visual não-preservada pela geração).
+- [x] **Checkpoint incremental em `generate_concepts()`** (pendência antiga): novo parâmetro
+      `checkpoint` chamado após cada conceito concluído; o `main` passa um callback
+      best-effort que persiste `concepts.json` parcial (falha de checkpoint nunca aborta o
+      lote — `persist_concepts` com `zip` aceita lista parcial naturalmente). Elimina a
+      classe de perda "timeout no post 18/18 perde o lote inteiro". **Primeira delegação real
+      ao modelo local**: o teste unitário foi rascunhado pelo `qwen3-coder:30b` via Ollama
+      (spec fechada, sem rede no teste); revisão encontrou e corrigiu 1 bug do rascunho
+      (`concept.humor_approved` em vez de `concept["humor_approved"]` — conceitos são dicts).
+      Suíte: 31→33 passed.
+- [x] **Gate de fonte endurecido contra colagens/legendas embutidas** (caso Neymar/Haaland):
+      endurecer só o prompt **não funcionou** (regressão real contra a imagem original ainda
+      aprovava com `text_independence=3`, na borda do corte). Solução na filosofia do projeto:
+      o modelo responde dois booleanos explícitos no schema (`embedded_text_carries_meaning`,
+      `multi_photo_collage`) e os tetos são impostos deterministicamente em
+      `finalize_source_suitability_review` (legenda→text_independence≤2; colagem→além disso
+      visual_clarity≤3). Verificado empiricamente: a colagem real agora é rejeitada; imagem
+      boa (gato de feltro, foto única) continua aprovada. +2 testes determinísticos.
+- [x] **Decisão de fluxo formalizada** (pendência estratégica): o funil autônomo fica como
+      está (~10% de rendimento líquido é aceitável para matéria-prima do `r/popular`), e a
+      **revisão de texto pelo Claude antes de qualquer render vira etapa padrão do fluxo** —
+      com o critério já acordado de até 2 tentativas de correção e descarte se persistir
+      (ver memória `joke-fix-retry-limit`). Justificativa empírica: essa revisão salvou 1 dos
+      3 conceitos úteis (gato de feltro) e evitou 2 renders desperdiçados (Neymar/Haaland
+      teria falhado na tela; hotel/TV falhou mesmo com revisão, mas o descarte custou 2
+      renders em vez de virar entrega ruim).
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
