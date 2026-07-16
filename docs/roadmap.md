@@ -323,6 +323,14 @@ e cada uma mudou o próximo passo:
       20/~60 imagens avaliadas (~33%), consistente com a taxa observada no primeiro teste
       (27%). Lista completa dos 20 títulos aprovados em
       `data/media-pipeline/popular-curated-backlog.json`.
+- [ ] **Funil de humor rodando nos 20 curados do `r/popular`** (sem render). Backlog
+      convertido para o formato de `--posts-file` (só o campo `post` de cada entrada
+      aprovada) em `data/media-pipeline/popular-curated-backlog-selected.json`. Rodando com
+      os defaults calibrados (`--humor-model qwen3:14b`, `--concept-timeout 600`,
+      `--humor-second-critic-model qwen2.5vl:7b` já é default). Expectativa baseada no
+      histórico da sessão: 2-4 aprovados em 20 (~10-15%). Próximo passo depois de concluir:
+      revisão humana do texto de cada aprovado antes de renderizar (lição do gato+galáxia —
+      consenso alto não garante piada coerente).
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
