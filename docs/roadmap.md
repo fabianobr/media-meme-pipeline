@@ -376,6 +376,22 @@ e cada uma mudou o próximo passo:
   não só o post em andamento). Não refatorado agora (mudança maior no fluxo central); mitigado
   dividindo os 18 restantes em 2 lotes de 9 (cada um roda bem dentro de 1h, ~4-6min/post).
   Considerar adicionar checkpoint incremental a `generate_concepts()` como item futuro.
+- **3 kills seguidos do lote A em background** (não timeout, não OOM, sem traceback) — parei
+  de insistir sozinho após a 3ª e perguntei ao usuário como prosseguir; ele mandou tentar de
+  novo. 4ª tentativa rodou de ponta a ponta sem problema. Causa provável: reciclagem do
+  próprio ambiente de sessão em background, não um bug do pipeline.
+- [x] **Lote A concluído: 2/9 aprovados.** "One has brains and the other one has tattoos"
+      (Neymar relógio vs Haaland livro) e "Watching the semifinal on a flatscreen tv in the
+      hotel."
+- **Segundo problema estrutural de fonte encontrado (não é texto, ver critério em
+  `joke-fix-retry-limit`)**: a imagem do "brains vs tattoos" é o post inteiro do Neymar/Haaland
+  com legenda embutida — o meme só faz sentido lendo a legenda (quem é quem, os preços), e são
+  duas fotos/pessoas diferentes que a piada gerada tratou como uma só ("EU DEI O LIVRO ...
+  TROQUEI CULTURA POR LUXO", narrativa em 1ª pessoa que não corresponde à cena real de duas
+  pessoas distintas). Isso deveria ter reprovado no gate de fonte (`text_independence`), não
+  passou. **Descartado** — não é um problema de texto corrigível por reescrita, é a mídia-fonte
+  que não serve. A do hotel/TV está ancorada na cena real, sem esse problema — segue para
+  render como está.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
