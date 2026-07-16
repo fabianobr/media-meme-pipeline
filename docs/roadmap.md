@@ -446,6 +446,11 @@ e cada uma mudou o próximo passo:
       3 conceitos úteis (gato de feltro) e evitou 2 renders desperdiçados (Neymar/Haaland
       teria falhado na tela; hotel/TV falhou mesmo com revisão, mas o descarte custou 2
       renders em vez de virar entrega ruim).
+- [ ] **Ciclo 2 de produção em andamento**: curadoria nova do `r/popular` (feed rodou de um
+      dia pro outro) rendeu **9 aprovados de 70 imagens avaliadas** — e o gate endurecido já
+      disparou em produção (rejeição do post do Zelensky com o motivo determinístico "texto
+      embutido carrega o significado do post"). Backlog acumulado: 29. Funil de humor rodando
+      nos 9 novos, agora protegido pelo checkpoint incremental.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
