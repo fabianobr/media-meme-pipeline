@@ -351,6 +351,18 @@ e cada uma mudou o próximo passo:
       trocada por âncora real na cena (mesa de madeira, postura parada). Salvo em
       `data/media-pipeline/popular-humor-funnel/2026-07-15/approved-two-fixed.json`, pronto
       para retomar via `--approved-concepts-file` e renderizar os dois.
+- **Correção de rumo do usuário**: apliquei a correção do texto e voltei a perguntar "quer
+  que eu siga pro render?" — o usuário apontou que isso contradiz a própria autonomia que
+  acabou de dar (corrigir → julgar → seguir sozinho, sem parar pra pedir permissão de novo).
+  Lição aplicada imediatamente: segui direto para o render sem novo gate de confirmação.
+- [x] **Primeiro render de posts do `r/popular` concluído: 2 vídeos, verificados e
+      entregues.** 241 quadros (9,64s) usado direto (mesmo padrão de 3 frases do
+      gato+galáxia), sem repetir a subestimativa de duração já documentada acima. Um retry
+      necessário: primeira tentativa falhou no preflight por timeout pontual de leitura no
+      ComfyUI (5s), confirmado saudável logo depois (`/system_stats` respondeu rápido, GPU
+      livre) — segunda tentativa rodou de ponta a ponta sem erro. Ambos os vídeos passaram
+      nas duas verificações (Whisper: texto completo, sem corte; `silencedetect`: ~2s de
+      pausa final real nos dois) e foram entregues ao usuário.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
