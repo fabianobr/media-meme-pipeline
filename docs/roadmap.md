@@ -368,6 +368,14 @@ e cada uma mudou o próximo passo:
       gate de fonte) pode aprovar diferente do que a primeira rodada, como já visto no caso
       "employee of the month" (rejeitado numa amostra, aprovado de primeira noutra). Rodando
       em `data/media-pipeline/popular-humor-funnel-retry/`.
+- **Bug confirmado no pipeline principal (não só no script de curadoria)**: o timeout de 1h
+  bateu no post 18/18 (última rodada de crítico) e **nada foi salvo** — `generate_concepts()`
+  processa o lote inteiro numa chamada só, e `persist_concepts()` só é chamado depois que ela
+  retorna. Diferente do `reddit_popular_curation.py` (que já tem checkpoint incremental), o
+  pipeline principal ainda não tem — mesma classe de bug, escopo maior (perde o lote inteiro,
+  não só o post em andamento). Não refatorado agora (mudança maior no fluxo central); mitigado
+  dividindo os 18 restantes em 2 lotes de 9 (cada um roda bem dentro de 1h, ~4-6min/post).
+  Considerar adicionar checkpoint incremental a `generate_concepts()` como item futuro.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
