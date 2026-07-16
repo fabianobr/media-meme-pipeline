@@ -331,6 +331,26 @@ e cada uma mudou o próximo passo:
       histórico da sessão: 2-4 aprovados em 20 (~10-15%). Próximo passo depois de concluir:
       revisão humana do texto de cada aprovado antes de renderizar (lição do gato+galáxia —
       consenso alto não garante piada coerente).
+- [x] **Funil concluído: 2/20 aprovados (10%)**, dentro da faixa prevista. "Birdie trying out
+      his new set of wheels" (cão paraplégico + cadeira de rodas) e "I made a life-size
+      needle-felted cat!" (escultura de feltro).
+- **Revisão humana encontrou 1 problema real, 1 falso alarme meu**: a piada do gato de feltro
+  tinha lógica invertida (afirmava "não é de fibra, é de fato/real" quando o post original é
+  sobre uma escultura que PARECE real). Eu também suspeitei que a legenda queimada na imagem
+  do cão ("Trying to help the paralyzed dog...") + marca d'água do TikTok fosse um problema
+  estrutural — **verifiquei e não é**: a descrição visual gerada pelo modelo nunca menciona a
+  legenda, e o prompt de imagem já pede explicitamente "no readable text, labels, watermarks"
+  — a etapa de imagem-base limpa já filtra isso por design. Retratei essa suspeita.
+- **Novo critério do usuário, salvo como padrão permanente**: autonomia para tentar corrigir
+  até 2x um problema de texto detectado numa piada aprovada, descartando se continuar ruim
+  depois disso — em vez de sempre perguntar antes de tentar. Ver memória
+  `joke-fix-retry-limit`.
+- [x] **Correção aplicada (tentativa 1/2) ao gato de feltro**: "GATO PARADO NA MESA DE
+      MADEIRA. OLHAR DESCONFIADO, PELO PERFEITO. NA VERDADE É TODO FEITO DE FELTRO." — lógica
+      corrigida (parece real, mas é feltro) e abertura genérica reciclada ("EU ABRI O MUNDO")
+      trocada por âncora real na cena (mesa de madeira, postura parada). Salvo em
+      `data/media-pipeline/popular-humor-funnel/2026-07-15/approved-two-fixed.json`, pronto
+      para retomar via `--approved-concepts-file` e renderizar os dois.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
