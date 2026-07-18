@@ -613,3 +613,18 @@ e cada uma mudou o próximo passo:
   t=1s) → **descartado**. #3 (bezerro highland): espécie trocada pra gato comum (mesmo padrão
   do caso do lobo). #1 e #3 na 2ª tentativa (resample completo da imagem-base) — ainda dentro
   do critério de 2 tentativas.
+- **Causa raiz REAL do "prior de gato" encontrada (não era prior do modelo, era bug no
+  código)**: `build_video_script` tinha um branch de fallback que dizia literalmente
+  `"Character: One fictional cat or person already present..."` para qualquer sujeito não
+  reconhecido pelas regex (bezerro, lobo, veado etc.) — o próprio prompt oferecia "cat" como
+  alternativa, competindo com a menção real da espécie. E o branch de gato hardcodava "The
+  orange cat" genérico, apagando detalhes específicos (perdeu a divisão de cores do gato
+  bicolor). Confirmado lendo o `image_prompt` real usado no render do bezerro: "Character:
+  One fictional cat or person...", igual ao código. **Corrigido**: os dois branches agora
+  citam o `visual_summary` (a descrição real da cena) em vez de nomear "cat" como opção;
+  nunca perdem a espécie/cor/marcas específicas. 2 testes de regressão novos (bezerro nunca
+  menciona gato; gato bicolor preserva a heterocromia). Suíte: 37 passed.
+- **Saldo do lote de 4 do ciclo 3**: 1/4 sobreviveu (piscina Star Wars, verificado e
+  entregue), 3/4 descartados após 2 tentativas cada — mas a causa raiz dos 3 descartes é o
+  bug agora corrigido, então o próximo lote deve ter uma taxa de sobrevivência bem mais alta
+  nos casos não-gato/não-humano.

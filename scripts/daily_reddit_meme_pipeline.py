@@ -878,10 +878,18 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             "Keep the same composition, lighting, and object placement. "
             "No readable text, labels, screens, signs, posters, or extra objects."
         )
+        # The subject's species/identity must never be replaced by a generic placeholder here:
+        # a fallback that names a specific animal (e.g. "cat") competes with, and often beats,
+        # whatever species the source description actually mentions (2026-07-18: a newborn
+        # calf and a wolf both rendered as a cat because this branch used to say "cat or
+        # person"). Always defer to visual_summary's own wording for species/color/markings.
         cat_scene = bool(re.search(r"\b(cat|gato|gatos|cat-like|feline)\b", f"{title} {visual_summary}", re.I))
         if cat_scene:
-            character = "The orange cat stays seated in the same place, blinks once, and makes a tiny ear twitch."
-            prop = "The cat itself is the main subject, preserved clearly and not replaced."
+            character = (
+                f"The exact subject described in the scene ({visual_summary}), preserving its species, fur "
+                "colors, and markings precisely, stays in place, blinks once, and makes a tiny ear twitch."
+            )
+            prop = "The subject already described in the scene is the main subject, preserved clearly and not replaced."
         elif re.search(r"\b(homem|mulher|pessoa|adulto|jovem|criança|person|man|woman)\b", visual_summary, re.I):
             character = (
                 "The visible human subject, kept generic and fictional, with the same approximate pose, stable face, "
@@ -890,7 +898,9 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             prop = "The visible human subject is the main subject, preserved clearly and not replaced."
         else:
             character = (
-                "One fictional cat or person already present in the scene, mostly still, with a serious readable reaction."
+                f"The exact subject already described in the scene ({visual_summary}) — its species, fur or "
+                "feather colors, and markings must be preserved precisely, never substituted for a different "
+                "animal — stays mostly still with a serious readable reaction."
             )
             prop = "The main visible subject from the source image, preserved clearly and not replaced."
 

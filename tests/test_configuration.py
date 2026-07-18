@@ -509,6 +509,33 @@ class GenerateConceptsCheckpointTests(unittest.TestCase):
             self.assertFalse(concept["humor_approved"])
 
 
+class VideoScriptSpeciesPreservationTests(unittest.TestCase):
+    def _post(self, title: str) -> reddit.RedditPost:
+        return reddit.RedditPost(
+            subreddit="popular", id="t3_x", title=title, author="x", url="", updated="",
+            summary="", rank=1, media_type="image",
+        )
+
+    def test_non_cat_non_human_subject_never_offers_cat_as_an_alternative(self) -> None:
+        post = self._post("A Scottish Highland Cow Born Just Two Hours Ago")
+        concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": "pov_spiral"}
+        script = pipeline.build_video_script(
+            post, concept,
+            visual_description="Um bezerro pequeno esta em uma area coberta de serragem, com pelucio cinza escuro.",
+        )
+        self.assertNotIn("cat", script["character"].lower())
+        self.assertIn("bezerro", script["character"].lower())
+
+    def test_cat_scene_preserves_specific_markings_instead_of_generic_orange(self) -> None:
+        post = self._post("A cat with fur and eyes that are split into two distinct colors")
+        concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": "pov_spiral"}
+        script = pipeline.build_video_script(
+            post, concept,
+            visual_description="Um gato com metade do rosto de uma cor e metade de outra, olhos heterocromicos.",
+        )
+        self.assertIn("heterocromicos", script["character"].lower())
+
+
 class ConceptSchemaTests(unittest.TestCase):
     def test_schema_rejects_non_mp4_video_path(self) -> None:
         post = pipeline.reddit.RedditPost(
