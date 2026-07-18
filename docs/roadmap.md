@@ -575,3 +575,10 @@ e cada uma mudou o próximo passo:
       antes do hardening (0/15, 0/15, 1/15, 2/15 em replays anteriores do mesmo lote); não há
       evidência de que a rubrica nova tenha reintroduzido falsos negativos. O gargalo
       dominante continua sendo consenso entre os dois críticos, não a rubrica de ancoragem.
+- [x] **Baseline de qualidade A/V registrado a pedido do usuário** (antes de avançar pro
+      ciclo 3): os dois renders com veredito "audio e video perfeitos" copiados para
+      `data/media-pipeline/reference-baseline/` (galáxia 9,64s e cavalo 9s, vídeos +
+      imagens-base), com a receita reproduzível documentada na memória
+      `av-quality-baseline`: sujeito único em close/plano médio com rosto visível, imagem-base
+      vetada, 768×448/225-249 quadros, narrador com atitude, fala com ≥1s de cauda. Todo
+      render novo deve ser comparado contra esses arquivos antes de ser entregue.
