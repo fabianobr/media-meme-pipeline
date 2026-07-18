@@ -582,3 +582,16 @@ e cada uma mudou o próximo passo:
       `av-quality-baseline`: sujeito único em close/plano médio com rosto visível, imagem-base
       vetada, 768×448/225-249 quadros, narrador com atitude, fala com ≥1s de cauda. Todo
       render novo deve ser comparado contra esses arquivos antes de ser entregue.
+- [x] **Ciclo 3, veredito de texto do usuário via página de revisão (Artifact)**: os 4 textos
+      propostos foram aprovados ("estão todos aprovados, gostei mais do 4 AIRBNB"). Fluxo novo
+      validado: candidatas do funil (0/15 por consenso) recuperadas dos `rounds` persistidos,
+      filtradas/reescritas por mim no padrão narrador-com-opinião, e apresentadas com o post
+      original lado a lado numa página HTML — veredito de texto barato antes de qualquer GPU.
+- **Consulta do usuário sobre viés ("muito bichinho — certeza que é r/popular?")** respondida
+  com dados: fonte confirmada (URLs de origem em 20+ subreddits diversos); o viés é do nosso
+  próprio funil — no ciclo 3, 71 das 76 rejeições de curadoria foram texto embutido/colagem
+  (prints, manchetes, placares dominam o r/popular), e o gate de motion_potential (rosto em
+  close) enriquece animais ainda mais. Viés documentado e ajustável, não um bug de fonte.
+- [ ] Render dos 4 aprovados em andamento (textos encurtados em 2-3 palavras nos itens 1/2/4
+      para ≤22 palavras/9,96s; specs de movimento por cena; câmera estática; item 4 é a
+      aposta consciente de cena aberta com movimento vindo da água).
