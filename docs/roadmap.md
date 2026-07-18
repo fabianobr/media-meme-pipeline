@@ -606,3 +606,10 @@ e cada uma mudou o próximo passo:
   ("no cuts, no scene transition"). Tratado como defeito de mídia-fonte/geração (não de
   texto): vídeo e imagem final apagados, imagem-base mantida (estava correta), 1 nova
   tentativa de render disparada.
+- **Inspeção visual dos 4 revelou 3 de 4 com defeito real** (só o #4, piscina Star Wars, passou
+  de primeira — áudio e cena corretos). #1 (gato bicolor): imagem-base não renderizou a
+  divisão de cores, âncora inteira da piada ausente. #2 (gato no sol): drift catastrófico de
+  cena pra um humano genérico — em AMBAS as tentativas (2/2), pior na segunda (drift já em
+  t=1s) → **descartado**. #3 (bezerro highland): espécie trocada pra gato comum (mesmo padrão
+  do caso do lobo). #1 e #3 na 2ª tentativa (resample completo da imagem-base) — ainda dentro
+  do critério de 2 tentativas.
