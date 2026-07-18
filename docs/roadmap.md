@@ -595,3 +595,14 @@ e cada uma mudou o próximo passo:
 - [ ] Render dos 4 aprovados em andamento (textos encurtados em 2-3 palavras nos itens 1/2/4
       para ≤22 palavras/9,96s; specs de movimento por cena; câmera estática; item 4 é a
       aposta consciente de cena aberta com movimento vindo da água).
+- **Novo modo de falha encontrado no render dos 4 aprovados**: "This cat keeps moving to
+  always be in the sunshine" sofreu **drift catastrófico de cena no meio do clipe** — começa
+  correto (gato no feixe de sol, frame t=1s confere com a imagem-base) e no meio vira um
+  personagem humano 3D genérico olhando pro celular, sem relação nenhuma com a cena de
+  origem. Áudio saiu junto quebrado (Whisper transcreveu algo sem relação com o texto
+  pedido, só ~3s de fala de 9,96s). Distinto dos modos de falha já catalogados (imagem-base
+  incoerente, ancoragem de tamanho/espécie frágil) — aqui a IMAGEM-BASE estava correta; o
+  drift aconteceu na geração temporal do vídeo em si, violando a própria instrução do prompt
+  ("no cuts, no scene transition"). Tratado como defeito de mídia-fonte/geração (não de
+  texto): vídeo e imagem final apagados, imagem-base mantida (estava correta), 1 nova
+  tentativa de render disparada.
