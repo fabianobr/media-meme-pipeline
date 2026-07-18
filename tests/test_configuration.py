@@ -359,6 +359,32 @@ class SourceSuitabilityTests(unittest.TestCase):
         self.assertFalse(review["approved"])
         self.assertEqual(review["scores"]["text_independence"], 2.0)
 
+    def test_descriptive_dialogue_body_is_rejected_deterministically(self) -> None:
+        source = "um cao paraplegico em pe na praia com cadeira de rodas ao lado e pessoa ajudando"
+        issues = pipeline.humor_candidate_issues(
+            {
+                "setup": "CAO EM PE NA PRAIA",
+                "escalation": "CADEIRA DE RODAS AO LADO, PESSOA AJUDANDO",
+                "punchline": "ELE E O REI DO ASFALTO",
+                "comic_turn": "a virada da ao cao um papel inesperado de dono da rua",
+            },
+            source,
+        )
+        self.assertIn("setup e escalada apenas descrevem a cena; falta narrador com opiniao", issues)
+
+    def test_narrator_with_attitude_dialogue_passes_the_description_check(self) -> None:
+        source = "um cavalo e um gato juntos em um estabulo"
+        issues = pipeline.humor_candidate_issues(
+            {
+                "setup": "TREINADOR MANDOU FOTO DE AMIZADE",
+                "escalation": "HUMMM MUITO ESTRANHO ISSO AQUI",
+                "punchline": "TREINAMENTO PARA COEXISTENCIA SERA",
+                "comic_turn": "o narrador desconfia da amizade e especula um programa secreto",
+            },
+            source,
+        )
+        self.assertNotIn("setup e escalada apenas descrevem a cena; falta narrador com opiniao", issues)
+
     def test_multi_photo_collage_caps_clarity_and_text_independence(self) -> None:
         review = pipeline.finalize_source_suitability_review({
             "approved": True,

@@ -26,6 +26,11 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 - Contrato de onboarding reproduzível (`scripts/check_environment.py`, `scripts/bootstrap.sh`).
 
 ### Changed
+- Funil de humor recalibrado para voz narrativa: regra determinística rejeita diálogo cujo
+  setup+escalada apenas descrevem a cena (≥60% de overlap com a fonte); prompt do escritor e
+  rubrica dos críticos exigem narrador com opinião (suspeita/ironia/reação) em vez de
+  audiodescrição; gate de fonte pontua `motion_potential` pelo que o I2V realmente anima
+  (rosto em close ou elementos móveis; cena aberta com sujeitos distantes ≤2).
 - Adotado o grafo oficial do template ComfyUI `video_ltx2_3_i2v`
   (`workflows/05-ltx23-official-i2v-audio-api.json`) como caminho I2V default, substituindo o
   grafo hand-built (`04`, aposentado) que rodava um regime de guidance incompatível com o LoRA

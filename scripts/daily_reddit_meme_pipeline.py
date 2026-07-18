@@ -1149,6 +1149,15 @@ def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> 
         described = punchline_tokens & token_set(source_text)
         if len(described) / len(punchline_tokens) >= 0.6:
             issues.append("punchline apenas descreve a cena visivel; falta reinterpretacao")
+    # User verdict 2026-07-18: dialogues that inventory the visible scene ("CAO EM PE NA
+    # PRAIA. CADEIRA DE RODAS AO LADO...") sound like audio description, not a joke. The
+    # approved style is a narrator WITH a take (irony, suspicion, reaction). Same overlap
+    # proxy as the punchline check, applied to the setup+escalation body.
+    body_tokens = token_set(f"{setup} {escalation}")
+    if body_tokens and source_text:
+        described_body = body_tokens & token_set(source_text)
+        if len(described_body) / len(body_tokens) >= 0.6:
+            issues.append("setup e escalada apenas descrevem a cena; falta narrador com opiniao")
     return issues
 
 
@@ -1341,6 +1350,14 @@ Regras obrigatorias:
   conceito abstrato sem nenhuma pista visual correspondente. Exemplo do que descartar: usar
   "Brasil" ou "astronomo" para um gato sonolento com fundo escuro de luzes, sem nada na cena
   que sugira essas ideias.
+- A voz da piada e um NARRADOR COM OPINIAO reagindo a cena, nunca uma legenda neutra.
+  Setup e escalada precisam carregar suspeita, ironia, julgamento ou reacao do narrador —
+  se as tres frases lidas em voz alta soariam como audiodescricao do video, descarte.
+- Terceiro modelo aprovado em producao (nao copie os substantivos): para uma foto de cavalo
+  e gato juntos num estabulo, setup "TREINADOR MANDOU FOTO DE AMIZADE", escalada "MAS A FOTO
+  MOSTRA CAVALO E GATO JUNTOS, HUMMM ESTRANHO", punchline "TREINAMENTO PARA COEXISTENCIA,
+  SERA?". O narrador desconfia, comenta e especula — ele nao descreve; a reacao dele E a
+  piada.
 {f"- Corrija estes problemas apontados na rodada anterior: {feedback}" if feedback else ""}
 
 Fonte:
@@ -1401,6 +1418,12 @@ tem nenhum elemento correspondente na cena, ela nao esta ancorada — visual_pay
 maximo 4, mesmo que a piada pareca engracada isolada do contexto. Uma virada ancorada pode
 muito bem dar um papel/intencao inesperada ao sujeito (ver exemplo do Gerald), mas a pista
 que sustenta esse papel tem que estar na cena, nao inventada do nada.
+
+Teste de voz narrativa (obrigatorio antes de pontuar laugh): leia as tres frases como o
+audio de um video. Se soam como audiodescricao neutra do que a imagem ja mostra (inventario
+de sujeito, objeto e lugar, sem suspeita, ironia, julgamento ou reacao de um narrador),
+laugh e surprise valem no maximo 4. A piada boa e a REACAO do narrador a cena, nao o relato
+dela.
 
 Use esta ancora de escala de forma literal em todos os criterios:
 - 5: apenas funcional ou descritivo;
@@ -2419,7 +2442,11 @@ Dimensoes da imagem: {width}x{height}
 Pontue de 0 a 5:
 - source_match: a imagem mostra os elementos ou a acao centrais descritos pelo post;
 - visual_clarity: sujeito e objetos principais sao claros e utilizaveis;
-- motion_potential: existe acao simples e visual que pode ser animada sem inventar outra cena;
+- motion_potential: existe acao simples e visual que pode ser animada sem inventar outra cena.
+  Pontue pelo que um modelo image-to-video anima DE VERDADE: rosto/expressao de um sujeito em
+  close ou plano medio (pisca, boca, cabeca), ou elementos intrinsecamente moveis (fogo, agua,
+  fumaca, multidao). Cena aberta com sujeitos pequenos/distantes e nada intrinsecamente movel
+  rende video estatico — pontue no maximo 2;
 - text_independence: a premissa pode ser entendida visualmente sem depender de OCR.
 
 Rejeite miniatura que nao mostre a acao do titulo, documento/screenshot dependente de leitura,

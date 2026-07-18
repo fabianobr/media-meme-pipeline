@@ -534,6 +534,26 @@ e cada uma mudou o próximo passo:
       timeline/character com ação específica da cena (derivada da descrição visual) em vez do
       template genérico "fixed stare / blinks once / minimal motion"** — o template só
       funciona por acaso em close de rosto.
+- **Veredito final do usuário (2026-07-18) nos 2 vídeos: reprovados nos 3 eixos** — "piada
+  sem punch, áudio é uma descrição do vídeo, vídeo é imagem estática com câmera em
+  movimento". Os dois conceitos foram **descartados** (2+ tentativas consumidas cada, pelo
+  critério). Diagnóstico unificado dos 3 eixos: (1) os diálogos que o usuário aprovou antes
+  eram um NARRADOR COM ATITUDE (suspeita, ironia, reação: "hummm estranho... será?", "finge
+  que tá contemplando") — os reprovados eram inventário neutro da cena, por isso soam como
+  audiodescrição; (2) piada descritiva e áudio-descritivo são o mesmo defeito; (3) cena
+  aberta continua rendendo vídeo estático mesmo com spec de ação — o LTX só anima com vida
+  rosto/expressão em close/plano médio, ou elementos intrinsecamente móveis (fogo, água).
+- [x] **Recalibração do funil nos 3 eixos** (commit desta entrada): regra determinística nova
+      em `humor_candidate_issues` (overlap de setup+escalada com a fonte ≥60% → "falta
+      narrador com opinião"); prompt do escritor com a regra da voz narrativa + o diálogo do
+      cavalo (aprovado pelo usuário) como 3º exemplar de produção; rubrica dos críticos com
+      "teste de voz narrativa" (audiodescrição → laugh/surprise ≤4); gate de fonte pontuando
+      `motion_potential` pelo que o I2V anima de verdade (close com rosto ou elemento móvel;
+      cena aberta com sujeitos distantes ≤2). Suíte: 35 passed (2 testes novos, incluindo o
+      diálogo do cavalo passando e o do Birdie sendo rejeitado pelo check novo).
+- **Mudança de processo para o próximo ciclo**: mostrar o TEXTO das piadas aprovadas ao
+  usuário ANTES de qualquer render — validação de texto é barata e instantânea; render é
+  caro. Três lotes seguidos de render desperdiçado teriam sido evitados com esse gate.
 - **Primeira tentativa de replay (`e2e-visual-anchor-hardening/2026-07-15`) invalidada por
   erro de metodologia próprio**: esqueci `--limit 15` no comando; o default é `--limit 10`, e
   `load_frozen_posts(args.posts_file)[:args.limit]` simplesmente trunca a lista congelada —
