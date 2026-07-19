@@ -28,6 +28,7 @@ Reddit RSS (r/popular, ?limit=100)
 6. ComfyUI renders native video from the checked-in I2V API workflow, animating the real downloaded photo (default `--ltx23-input-mode source`), in 2 segments when the clip exceeds the single-pass memory ceiling (~8s).
 7. The measured TTS narration is muxed as the audio track (default `--ltx23-audio-mode tts`).
 8. Python polls ComfyUI, downloads the MP4, validates it locally (Whisper transcription + silencedetect for words-to-duration calibration) and records review metadata.
+9. Approved videos also get a publish package: locally generated pt-BR title/description/interest topics/hashtags (`publish.json`/`publish.txt`) and a 1080×1920 blur-padded `final_916.mp4` for Shorts/Reels/TikTok; the validated native MP4 is kept unchanged.
 
 The checked-in ComfyUI API workflows are the graph source of truth. Python may parameterize their declared inputs, but must not maintain a separate hand-built LTX 2.3 graph. The default engine is `ltx23` image-to-video with `workflows/05-ltx23-official-i2v-audio-api.json`, converted from the official ComfyUI template `video_ltx2_3_i2v` (distilled regime: CFG 1.0, manual distilled sigmas, half-resolution base pass, x2 latent upsample, 3-step refine); text-to-video remains a technical baseline. The retired hand-built I2V graph (`04`) failed the visual gate because it ran the distilled LoRA with CFG 3.0/7.0 plus STG at a quarter of the reference resolution and no refine pass — a guidance/schedule regime mismatch, not a prompt problem.
 
