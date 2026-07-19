@@ -1451,43 +1451,10 @@ def improve_humor_concept(
     critic_model = critic_model or model
     round_limit = 1 if seed_candidates is not None else MAX_HUMOR_ROUNDS
     execution = concept.setdefault("execution", {"state": "pending", "attempts": {}})
-    llm_calls = execution.setdefault("llm_calls", [])
+    generation_calls = execution.setdefault("generation_calls", [])
     encoded_critic_image = encode_image_for_vision(image_path) if image_path is not None else None
     if seed_candidates is not None:
         execution["humor_source"] = "frozen_seeds"
-
-    def timed_humor_request(call_kind: str, round_number: int, payload: dict[str, Any]) -> dict[str, Any]:
-        call_model = str(payload.get("model") or model)
-        call_record: dict[str, Any] = {
-            "stage": call_kind,
-            "round": round_number,
-            "model": call_model,
-            "timeout_seconds": timeout,
-            "started_at": datetime.now().astimezone().isoformat(),
-            "state": "running",
-        }
-        llm_calls.append(call_record)
-        started = time.monotonic()
-        print(f"Humor {call_kind} round {round_number}/{round_limit} started ({call_model}, timeout={timeout}s)")
-        try:
-            response = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
-        except Exception as exc:  # noqa: BLE001
-            call_record["state"] = "failed"
-            call_record["error"] = str(exc)
-            raise
-        else:
-            call_record["state"] = "completed"
-            content = str((response.get("message") or {}).get("content") or "")
-            call_record["response_chars"] = len(content)
-            call_record["response_preview"] = content[:500]
-        finally:
-            call_record["elapsed_seconds"] = round(time.monotonic() - started, 3)
-            call_record["finished_at"] = datetime.now().astimezone().isoformat()
-            print(
-                f"Humor {call_kind} round {round_number}/{round_limit} "
-                f"{call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
-            )
-        return response
 
     safety_context = f"{post.title} {post.summary}".lower()
     sensitive_terms = (
@@ -1624,20 +1591,24 @@ Fonte:
             if seed_candidates is not None:
                 candidates = deepcopy(seed_candidates)
             else:
-                writer_data = timed_humor_request(
-                    "writer",
-                    round_number,
-                    {
-                    "model": model,
-                    "stream": False,
-                    "think": False,
-                    "format": candidates_schema,
-                    "messages": [
-                        {"role": "system", "content": "Voce e um redator de humor brasileiro conciso e observacional."},
-                        {"role": "user", "content": writer_prompt},
-                    ],
-                    "options": {"temperature": 0.85, "num_predict": 1500},
+                writer_data = timed_generation_request(
+                    generation_calls,
+                    backend="ollama",
+                    stage="writer",
+                    round_number=round_number,
+                    payload={
+                        "model": model,
+                        "stream": False,
+                        "think": False,
+                        "format": candidates_schema,
+                        "messages": [
+                            {"role": "system", "content": "Voce e um redator de humor brasileiro conciso e observacional."},
+                            {"role": "user", "content": writer_prompt},
+                        ],
+                        "options": {"temperature": 0.85, "num_predict": 1500},
                     },
+                    timeout=timeout,
+                    url=f"{OLLAMA_URL}/api/chat",
                 )
                 writer_content = (writer_data.get("message") or {}).get("content") or ""
                 candidates = extract_json_array(writer_content)
@@ -1713,10 +1684,12 @@ Alternativas:
                 critic_user_message: dict[str, Any] = {"role": "user", "content": critic_prompt}
                 if encoded_critic_image and is_vision_capable_model(active_critic_model):
                     critic_user_message["images"] = [encoded_critic_image]
-                critic_data = timed_humor_request(
-                    f"critic_{critic_index}",
-                    round_number,
-                    {
+                critic_data = timed_generation_request(
+                    generation_calls,
+                    backend="ollama",
+                    stage=f"critic_{critic_index}",
+                    round_number=round_number,
+                    payload={
                         "model": active_critic_model,
                         "stream": False,
                         "think": False,
@@ -1727,6 +1700,8 @@ Alternativas:
                         ],
                         "options": {"temperature": 0.1, "num_predict": 900},
                     },
+                    timeout=timeout,
+                    url=f"{OLLAMA_URL}/api/chat",
                 )
                 critic_review = extract_json_object((critic_data.get("message") or {}).get("content") or "")
                 if not critic_review:

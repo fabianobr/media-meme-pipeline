@@ -106,5 +106,39 @@ class TimedGenerationRequestTests(unittest.TestCase):
         self.assertNotIn("round", calls[0])
 
 
+class HumorWiringTests(unittest.TestCase):
+    def test_writer_and_critic_calls_carry_prompt_and_options(self) -> None:
+        import json as jsonlib
+
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_x", title="A cat", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        concept = {"top_text": "A", "bottom_text": "B", "meme_logic": "c"}
+        candidates = [
+            {"id": i, "mechanic": "contrast", "setup": "MEU GATO TINHA NOME", "escalation": "CADA APELIDO CRIOU OUTRO",
+             "punchline": "AGORA É BEANSTER", "comic_turn": "O apelido substitui o nome ate ninguém lembrar dele",
+             "scene_payoff": "cat and owner"} for i in range(1, 6)
+        ]
+        review = {"approved": True, "winner_id": 1,
+                  "scores": {"source_fit": 9, "natural_ptbr": 9, "surprise": 9, "laugh": 9, "visual_payoff": 9},
+                  "reason": "ok"}
+        responses = [
+            {"message": {"content": jsonlib.dumps({"candidates": candidates})}},
+            {"message": {"content": jsonlib.dumps(review)}},
+        ]
+        with patch.object(pipeline, "request_json", side_effect=responses):
+            result = pipeline.improve_humor_concept(
+                post, concept, "writer-model", 5, "a cat", critic_model="critic-model"
+            )
+        calls = result["execution"]["generation_calls"]
+        self.assertEqual([c["stage"] for c in calls], ["writer", "critic_1"])
+        self.assertEqual(calls[0]["model"], "writer-model")
+        self.assertIsInstance(calls[0]["prompt"], list)
+        self.assertEqual(calls[0]["options"], {"temperature": 0.85, "num_predict": 1500})
+        self.assertEqual(calls[1]["model"], "critic-model")
+
+
 if __name__ == "__main__":
     unittest.main()

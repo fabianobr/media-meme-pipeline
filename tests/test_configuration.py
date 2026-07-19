@@ -187,9 +187,9 @@ class HumorGateTests(unittest.TestCase):
         self.assertFalse(result["humor_approved"])
         self.assertTrue(result["humor_review"]["error"])
         self.assertEqual(request.call_count, 1)
-        self.assertEqual(result["execution"]["llm_calls"][0]["stage"], "writer")
-        self.assertEqual(result["execution"]["llm_calls"][0]["state"], "failed")
-        self.assertIn("critic offline", result["execution"]["llm_calls"][0]["error"])
+        self.assertEqual(result["execution"]["generation_calls"][0]["stage"], "writer")
+        self.assertEqual(result["execution"]["generation_calls"][0]["state"], "failed")
+        self.assertIn("critic offline", result["execution"]["generation_calls"][0]["error"])
 
     def test_generation_stops_after_three_rounds(self) -> None:
         candidates = [
@@ -211,8 +211,8 @@ class HumorGateTests(unittest.TestCase):
         self.assertFalse(result["humor_approved"])
         self.assertEqual(len(result["humor_rounds"]), 3)
         self.assertEqual(request.call_count, 6)
-        self.assertEqual(len(result["execution"]["llm_calls"]), 6)
-        self.assertTrue(all(call["state"] == "completed" for call in result["execution"]["llm_calls"]))
+        self.assertEqual(len(result["execution"]["generation_calls"]), 6)
+        self.assertTrue(all(call["state"] == "completed" for call in result["execution"]["generation_calls"]))
         self.assertTrue(all(call.kwargs["json"]["think"] is False for call in request.call_args_list))
         self.assertEqual(
             [call.kwargs["json"]["model"] for call in request.call_args_list],
