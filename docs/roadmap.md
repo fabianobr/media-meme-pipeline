@@ -628,3 +628,14 @@ e cada uma mudou o próximo passo:
   entregue), 3/4 descartados após 2 tentativas cada — mas a causa raiz dos 3 descartes é o
   bug agora corrigido, então o próximo lote deve ter uma taxa de sobrevivência bem mais alta
   nos casos não-gato/não-humano.
+- [x] **Regra "bug corrigido zera tentativas" aplicada e validada — 4/4 entregues no fim.**
+      Critério novo salvo em `joke-fix-retry-limit`. Resultado após zerar: gato no sol
+      corrigiu de primeira (sem o drift catastrófico); gato bicolor e bezerro precisaram de
+      mais uma rodada com o traço específico (heterocromia / espécie exata) injetado direto
+      no `character` do video_script, bypassando a descrição visual do modelo de visão que
+      era fraca demais nesses detalhes específicos. **Lição adicional**: nem todo problema de
+      espécie/característica é o bug de código — quando a descrição visual upstream não
+      captura um traço sutil (divisão de cor simétrica, raça específica), a solução é
+      injetar o traço explicitamente no prompt em vez de confiar só no `visual_summary`.
+      Lote final: 4/4 conceitos do ciclo 3 entregues (piscina, gato no sol, gato bicolor,
+      bezerro highland).
