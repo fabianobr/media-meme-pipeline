@@ -60,6 +60,22 @@ def preview(value: str, limit: int = 150) -> str:
     return value[:limit] + ("..." if len(value) > limit else "")
 
 
+def upgrade_media_url(url: str) -> str:
+    """Rewrite a reddit preview/thumbnail URL to its full-resolution original when possible.
+
+    RSS embeds often point at `preview.redd.it/<name>?width=140&crop=...` thumbnails; the
+    original lives at `i.redd.it/<name>` under the same file name, so stripping the host and
+    query recovers full resolution. `external-preview.redd.it` names do NOT match their
+    origin file and the unauthenticated .json endpoint that would reveal it returns 403, so
+    those are left untouched (the curation resolution gate rejects them instead).
+    """
+
+    match = re.match(r"https?://preview\.redd\.it/([^?]+)", url or "")
+    if match:
+        return f"https://i.redd.it/{match.group(1)}"
+    return url
+
+
 def extract_media_url(raw_html: str, fallback_url: str) -> tuple[str, str]:
     candidates = re.findall(r'href="([^"]+)"', raw_html or "")
     candidates.extend(re.findall(r'src="([^"]+)"', raw_html or ""))
@@ -68,9 +84,9 @@ def extract_media_url(raw_html: str, fallback_url: str) -> tuple[str, str]:
     for url in decoded:
         lower = url.lower()
         if any(lower.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif")):
-            return "image", url
+            return "image", upgrade_media_url(url)
         if "i.redd.it" in lower or "preview.redd.it" in lower:
-            return "image", url
+            return "image", upgrade_media_url(url)
 
     for url in decoded:
         lower = url.lower()
@@ -79,7 +95,7 @@ def extract_media_url(raw_html: str, fallback_url: str) -> tuple[str, str]:
 
     lower_fallback = fallback_url.lower()
     if "i.redd.it" in lower_fallback or "preview.redd.it" in lower_fallback:
-        return "image", fallback_url
+        return "image", upgrade_media_url(fallback_url)
     if "v.redd.it" in lower_fallback:
         return "video", fallback_url
     return "text", ""

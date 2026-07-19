@@ -2305,16 +2305,26 @@ def wait_for_comfy_video(prompt_id: str, timeout_seconds: int, poll_seconds: flo
 def download_source_media(post: reddit.RedditPost, output_path: Path) -> str:
     if post.media_type not in {"image", "video"} or not post.media_url:
         return ""
-    try:
-        response = requests.get(post.media_url, timeout=60, headers={"User-Agent": "media-meme-pipeline/0.1"})
-        response.raise_for_status()
-        suffix = ".mp4" if post.media_type == "video" else ".jpg"
-        target = output_path.with_suffix(suffix)
-        target.write_bytes(response.content)
-        return str(target)
-    except Exception as exc:  # noqa: BLE001
-        print(f"WARN could not download source media for {post.id}: {exc}")
-        return ""
+    # Backlog entries curated before the full-res fix may still carry preview.redd.it
+    # thumbnail URLs; try the upgraded original first and fall back to the stored URL.
+    urls = []
+    upgraded = reddit.upgrade_media_url(post.media_url)
+    if upgraded != post.media_url:
+        urls.append(upgraded)
+    urls.append(post.media_url)
+    last_exc: Exception | None = None
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=60, headers={"User-Agent": "media-meme-pipeline/0.1"})
+            response.raise_for_status()
+            suffix = ".mp4" if post.media_type == "video" else ".jpg"
+            target = output_path.with_suffix(suffix)
+            target.write_bytes(response.content)
+            return str(target)
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+    print(f"WARN could not download source media for {post.id}: {last_exc}")
+    return ""
 
 
 def sanitize_visual_description(value: str) -> str:

@@ -58,6 +58,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--vision-model", default=pipeline.DEFAULT_VISION_MODEL)
     parser.add_argument("--source-critic-model", default="gemma3:12b")
     parser.add_argument("--vision-timeout", type=int, default=90)
+    parser.add_argument(
+        "--min-resolution",
+        type=int,
+        default=640,
+        help="Reject sources whose downloaded image has a shorter side below this (thumbnails are unusable as the real-photo video foundation).",
+    )
     parser.add_argument("--max-age-hours", type=int, default=72)
     parser.add_argument("--include-automoderator", action="store_true")
     parser.add_argument("--timeout", type=int, default=20, help="HTTP timeout in seconds for the RSS fetch.")
@@ -138,6 +144,19 @@ def main() -> int:
             save_backlog(args.backlog_file, backlog)
             continue
 
+        # Resolution gate: the "narrated real photo" pipeline uses the source photo itself
+        # as the video foundation, so a thumbnail-sized download (RSS sometimes only carries
+        # a 140px preview, and external-preview URLs cannot be upgraded) is unusable.
+        from PIL import Image as _Image
+        with _Image.open(media_path) as _im:
+            width, height = _im.size
+        if min(width, height) < args.min_resolution:
+            seen_ids.add(post.id)
+            backlog["seen_ids"] = sorted(seen_ids)
+            save_backlog(args.backlog_file, backlog)
+            print(f"  rejected: fonte em baixa resolucao ({width}x{height}, minimo {args.min_resolution}px no lado menor)", flush=True)
+            continue
+
         description = pipeline.describe_source_image(Path(media_path), args.vision_model, args.vision_timeout)
         evaluated += 1
         review = pipeline.assess_source_suitability(
@@ -152,6 +171,7 @@ def main() -> int:
                 {
                     "post": asdict(post),
                     "media_path": media_path,
+                    "media_resolution": [width, height],
                     "visual_description": description,
                     "review": review,
                     "curated_at": datetime.now(timezone.utc).isoformat(),

@@ -433,11 +433,14 @@ class PopularCurationBacklogTests(unittest.TestCase):
     def test_approved_image_post_is_added_and_already_seen_ids_are_not_reevaluated(self) -> None:
         post = self._post("i1", "image", 1)
         with tempfile.TemporaryDirectory() as tmp:
+            from PIL import Image as PILImage
+            fake_source = f"{tmp}/i1.jpg"
+            PILImage.new("RGB", (800, 800), (120, 90, 60)).save(fake_source)
             argv = ["reddit_popular_curation.py", "--backlog-file", f"{tmp}/backlog.json", "--media-dir", tmp]
             with patch.object(reddit, "fetch_feed", return_value=(200, "<feed/>", {}, [])), \
                  patch.object(reddit, "parse_feed", return_value=[post]), \
                  patch.object(reddit, "filter_posts", return_value=[post]), \
-                 patch.object(pipeline, "download_source_media", return_value="/tmp/i1.jpg"), \
+                 patch.object(pipeline, "download_source_media", return_value=fake_source), \
                  patch.object(pipeline, "describe_source_image", return_value="a cat"), \
                  patch.object(
                      pipeline,
