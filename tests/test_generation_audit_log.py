@@ -218,5 +218,47 @@ class VisionAndSourceGateWiringTests(unittest.TestCase):
         self.assertEqual(concepts[0]["execution"]["generation_calls"][0], pre_call)
 
 
+class LtxRenderWiringTests(unittest.TestCase):
+    def test_segment_render_appends_generation_call(self) -> None:
+        import tempfile
+
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_ltx", title="A frog", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source_photo = tmp_path / "source.jpg"
+            from PIL import Image
+            Image.new("RGB", (100, 100), color="green").save(source_photo)
+            concept = {
+                "top_text": "A", "middle_text": "B", "bottom_text": "C",
+                "source_media_path": str(source_photo),
+            }
+            output_path = tmp_path / "out.mp4"
+            args = pipeline.build_parser().parse_args([
+                "--ltx23-input-mode", "source", "--ltx23-audio-mode", "native",
+                "--output-root", str(tmp_path),
+            ])
+            with patch.object(
+                pipeline, "compose_ltx23_segment_prompts", return_value=["a frog on a leaf, literal prompt"]
+            ), patch.object(
+                pipeline, "queue_comfy_ltx23_native_video", return_value="prompt-id-1"
+            ), patch.object(
+                pipeline, "wait_for_comfy_video", return_value={"filename": "x", "subfolder": "", "type": "output"}
+            ), patch.object(
+                pipeline, "download_comfy_file"
+            ):
+                pipeline.render_ltx_video_meme(post, concept, str(source_photo), None, output_path, args)
+        calls = concept["execution"]["generation_calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["backend"], "comfyui")
+        self.assertEqual(calls[0]["stage"], "ltx_render")
+        self.assertEqual(calls[0]["prompt"], "a frog on a leaf, literal prompt")
+        self.assertEqual(calls[0]["options"]["width"], args.ltx23_width)
+        self.assertEqual(calls[0]["options"]["height"], args.ltx23_height)
+
+
 if __name__ == "__main__":
     unittest.main()

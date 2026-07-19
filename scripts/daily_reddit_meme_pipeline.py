@@ -3766,6 +3766,26 @@ def render_ltx_video_meme(
                     "reference_image_path": str(current_reference) if current_reference else None,
                 }
             )
+            concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
+                "generation_calls", []
+            ).append(
+                {
+                    "backend": "comfyui",
+                    "stage": "ltx_render",
+                    "round": segment_index,
+                    "model": (LTX23_I2V_API_WORKFLOW if current_reference else LTX23_API_WORKFLOW).name,
+                    "prompt": segment_prompt_text,
+                    "options": {
+                        "seed": segment_seed,
+                        "frames": frames,
+                        "fps": args.ltx23_fps,
+                        "width": args.ltx23_width,
+                        "height": args.ltx23_height,
+                        "input_mode": "image-to-video" if current_reference else "text-to-video",
+                    },
+                    "state": "completed",
+                }
+            )
             concept["video_prompt_id"] = prompt_id
             if segment_index < segment_count:
                 continuation_path = output_path.with_name(
