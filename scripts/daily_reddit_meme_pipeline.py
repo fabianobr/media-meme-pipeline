@@ -3335,6 +3335,32 @@ def finish_ltx23_with_tts(
     return output_path
 
 
+def format_video_916(input_path: Path, output_path: Path) -> Path:
+    """Fit any validated render into a 1080x1920 canvas for Shorts/Reels/TikTok: blurred
+    cover of the clip as background, the clip itself contained and centered on top. One
+    graph handles portrait and landscape sources alike; audio is copied untouched."""
+
+    filter_complex = (
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+        "crop=1080:1920,boxblur=luma_radius=24:luma_power=2[bg];"
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2[vout]"
+    )
+    run_ffmpeg(
+        [
+            "-i", str(input_path),
+            "-filter_complex", filter_complex,
+            "-map", "[vout]", "-map", "0:a?",
+            "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    return output_path
+
+
 def render_photomotion_meme(
     source_photo_path: Path,
     concept: dict[str, Any],

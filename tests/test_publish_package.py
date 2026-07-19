@@ -212,5 +212,28 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(legacy["publish"], {})
 
 
+class Format916Tests(unittest.TestCase):
+    def test_builds_blur_pad_ffmpeg_command(self) -> None:
+        captured: list[list[str]] = []
+        with patch.object(pipeline, "run_ffmpeg", side_effect=lambda args: captured.append(args)):
+            result = pipeline.format_video_916(Path("/in/video.mp4"), Path("/out/final_916.mp4"))
+        self.assertEqual(result, Path("/out/final_916.mp4"))
+        self.assertEqual(len(captured), 1)
+        args = captured[0]
+        joined = " ".join(args)
+        self.assertIn("/in/video.mp4", joined)
+        self.assertIn("/out/final_916.mp4", joined)
+        filter_arg = args[args.index("-filter_complex") + 1]
+        self.assertIn("scale=1080:1920:force_original_aspect_ratio=increase", filter_arg)
+        self.assertIn("crop=1080:1920", filter_arg)
+        self.assertIn("boxblur", filter_arg)
+        self.assertIn("force_original_aspect_ratio=decrease", filter_arg)
+        self.assertIn("overlay=(W-w)/2:(H-h)/2", filter_arg)
+        self.assertIn("[vout]", filter_arg)
+        self.assertEqual(args[args.index("-map") + 1], "[vout]")
+        self.assertIn("0:a?", args)
+        self.assertIn("+faststart", joined)
+
+
 if __name__ == "__main__":
     unittest.main()
