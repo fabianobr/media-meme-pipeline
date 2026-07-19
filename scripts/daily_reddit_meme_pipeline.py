@@ -1839,12 +1839,14 @@ def generate_concepts(
     seed_candidates_by_post: dict[str, list[dict[str, Any]]] | None = None,
     source_reviews: dict[str, dict[str, Any]] | None = None,
     image_paths: dict[str, str] | None = None,
+    generation_calls_by_post: dict[str, list[dict[str, Any]]] | None = None,
     checkpoint: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, str]]:
     visual_descriptions = visual_descriptions or {}
     seed_candidates_by_post = seed_candidates_by_post or {}
     source_reviews = source_reviews or {}
     image_paths = image_paths or {}
+    generation_calls_by_post = generation_calls_by_post or {}
     compact_posts = [
         {
             "index": idx,
@@ -1950,6 +1952,11 @@ Posts:
             "source_visual_description": visual_description,
             "source_review": deepcopy(source_reviews.get(post.id) or {}),
         }
+        pre_concept_calls = generation_calls_by_post.get(post.id) or []
+        if pre_concept_calls:
+            concept.setdefault("execution", {"state": "pending", "attempts": {}})["generation_calls"] = list(
+                pre_concept_calls
+            )
         if isinstance(item.get("video_script"), dict):
             concept["video_script"] = item["video_script"]
             concept["video_script"].setdefault("source_visual_description", visual_description)
@@ -2581,7 +2588,9 @@ def sanitize_visual_description(value: str) -> str:
     return value[:1200]
 
 
-def describe_source_image(image_path: Path, model: str, timeout: int) -> str:
+def describe_source_image(
+    image_path: Path, model: str, timeout: int, calls: list[dict[str, Any]] | None = None
+) -> str:
     if not image_path.exists():
         return ""
     try:
@@ -2606,17 +2615,19 @@ def describe_source_image(image_path: Path, model: str, timeout: int) -> str:
             "If a dangerous object appears, describe it only as a generic handheld prop without operational detail. "
             "Respond in concise Portuguese, 5 to 8 bullet-like clauses, no markdown."
         )
-        data = request_json(
-            "POST",
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "stream": False,
-                "messages": [{"role": "user", "content": prompt, "images": [encoded]}],
-                "options": {"temperature": 0.2},
-            },
-            timeout=timeout,
-        )
+        payload = {
+            "model": model,
+            "stream": False,
+            "messages": [{"role": "user", "content": prompt, "images": [encoded]}],
+            "options": {"temperature": 0.2},
+        }
+        if calls is not None:
+            data = timed_generation_request(
+                calls, backend="ollama", stage="vision_description",
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
+        else:
+            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
         return sanitize_visual_description((data.get("message") or {}).get("content") or "")
     except Exception as exc:  # noqa: BLE001
         print(f"WARN could not describe source image {image_path.name}: {exc}")
@@ -2664,6 +2675,7 @@ def assess_source_suitability(
     visual_description: str,
     model: str,
     timeout: int,
+    calls: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     schema = {
         "type": "object",
@@ -2716,19 +2728,21 @@ Responda somente JSON.
 Formato exato: {{"approved": false, "scores": {{"source_match": 0, "visual_clarity": 0,
 "motion_potential": 0, "text_independence": 0}}, "reason": "..."}}
 """.strip()
-        data = request_json(
-            "POST",
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "stream": False,
-                "think": False,
-                "format": schema,
-                "messages": [{"role": "user", "content": prompt}],
-                "options": {"temperature": 0, "seed": 20260705, "num_predict": 250},
-            },
-            timeout=timeout,
-        )
+        payload = {
+            "model": model,
+            "stream": False,
+            "think": False,
+            "format": schema,
+            "messages": [{"role": "user", "content": prompt}],
+            "options": {"temperature": 0, "seed": 20260705, "num_predict": 250},
+        }
+        if calls is not None:
+            data = timed_generation_request(
+                calls, backend="ollama", stage="source_suitability",
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
+        else:
+            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
         review = extract_json_object((data.get("message") or {}).get("content") or "")
         if not review:
             raise ValueError("source suitability model did not return JSON")
@@ -2746,9 +2760,10 @@ def prepare_source_media(
     posts: list[reddit.RedditPost],
     run_dir: Path,
     args: argparse.Namespace,
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, list[dict[str, Any]]]]:
     source_media_paths: dict[str, str] = {}
     visual_descriptions: dict[str, str] = {}
+    generation_calls_by_post: dict[str, list[dict[str, Any]]] = {}
     only_indexes = set(args.only_index or [])
     for idx, post in enumerate(posts, 1):
         if only_indexes and idx not in only_indexes:
@@ -2758,11 +2773,14 @@ def prepare_source_media(
         if path:
             source_media_paths[post.id] = path
         if args.describe_source_images and post.media_type == "image" and path:
-            description = describe_source_image(Path(path), args.vision_model, args.vision_timeout)
+            calls: list[dict[str, Any]] = []
+            description = describe_source_image(Path(path), args.vision_model, args.vision_timeout, calls)
+            if calls:
+                generation_calls_by_post[post.id] = calls
             if description:
                 visual_descriptions[post.id] = description
                 print(f"Source image described {idx}/{len(posts)}: {post.title[:70]}")
-    return source_media_paths, visual_descriptions
+    return source_media_paths, visual_descriptions, generation_calls_by_post
 
 
 def load_font(size: int, font_path: Path) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -4499,7 +4517,7 @@ def main() -> int:
     write_json(run_dir / "selected.json", [asdict(post) for post in posts])
     if not args.no_render:
         free_comfy_memory()
-    source_media_paths, visual_descriptions = prepare_source_media(posts, run_dir, args)
+    source_media_paths, visual_descriptions, generation_calls_by_post = prepare_source_media(posts, run_dir, args)
     source_reviews: dict[str, dict[str, Any]] = {}
     if approved_resume:
         for post, concept in zip(posts, concepts):
@@ -4521,12 +4539,14 @@ def main() -> int:
                     "reason": "controlled I2V experiment requires a downloaded source image",
                 }
                 continue
+            source_calls = generation_calls_by_post.setdefault(post.id, [])
             source_reviews[post.id] = assess_source_suitability(
                 post,
                 Path(source_path),
                 visual_descriptions.get(post.id, ""),
                 args.source_critic_model,
                 args.vision_timeout,
+                source_calls,
             )
             print(
                 f"Source gate {post.id}: "
@@ -4536,6 +4556,12 @@ def main() -> int:
 
         if args.skip_ollama_concepts:
             concepts = [fallback_concept(post, visual_descriptions.get(post.id, "")) for post in posts]
+            for post, concept in zip(posts, concepts):
+                pre_concept_calls = generation_calls_by_post.get(post.id) or []
+                if pre_concept_calls:
+                    concept.setdefault("execution", {"state": "pending", "attempts": {}})["generation_calls"] = list(
+                        pre_concept_calls
+                    )
         else:
             def checkpoint_partial(partial: list[dict[str, Any]]) -> None:
                 # Best-effort: losing a checkpoint must never abort the batch.
@@ -4555,6 +4581,7 @@ def main() -> int:
                 seed_candidates_by_post=seed_candidates_by_post,
                 source_reviews=source_reviews,
                 image_paths=source_media_paths,
+                generation_calls_by_post=generation_calls_by_post,
                 checkpoint=checkpoint_partial,
             )
         for concept in concepts:

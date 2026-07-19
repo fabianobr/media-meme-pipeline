@@ -140,5 +140,83 @@ class HumorWiringTests(unittest.TestCase):
         self.assertEqual(calls[1]["model"], "critic-model")
 
 
+class VisionAndSourceGateWiringTests(unittest.TestCase):
+    def test_describe_source_image_records_call(self) -> None:
+        import tempfile
+        from PIL import Image
+
+        calls: list[dict] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "photo.jpg"
+            Image.new("RGB", (10, 10), color="red").save(image_path)
+            with patch.object(
+                pipeline, "request_json", return_value={"message": {"content": "a red square"}}
+            ):
+                description = pipeline.describe_source_image(image_path, "vision-model", 30, calls)
+        self.assertEqual(description, "a red square")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["stage"], "vision_description")
+        self.assertEqual(calls[0]["model"], "vision-model")
+        self.assertIsInstance(calls[0]["prompt"], list)
+        self.assertTrue(
+            calls[0]["prompt"][0]["images"][0].startswith("[image omitted,")
+        )
+
+    def test_describe_source_image_without_calls_list_still_works(self) -> None:
+        import tempfile
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "photo.jpg"
+            Image.new("RGB", (10, 10), color="blue").save(image_path)
+            with patch.object(
+                pipeline, "request_json", return_value={"message": {"content": "a blue square"}}
+            ):
+                description = pipeline.describe_source_image(image_path, "vision-model", 30)
+        self.assertEqual(description, "a blue square")
+
+    def test_assess_source_suitability_records_call(self) -> None:
+        import tempfile
+        from PIL import Image
+        import json as jsonlib
+
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_y", title="A dog", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        review_payload = {
+            "approved": True, "reason": "ok",
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 5, "text_independence": 5},
+            "embedded_text_carries_meaning": False, "multi_photo_collage": False,
+        }
+        calls: list[dict] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "photo.jpg"
+            Image.new("RGB", (10, 10), color="green").save(image_path)
+            with patch.object(
+                pipeline, "request_json", return_value={"message": {"content": jsonlib.dumps(review_payload)}}
+            ):
+                pipeline.assess_source_suitability(post, image_path, "a dog photo", "critic-model", 30, calls)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["stage"], "source_suitability")
+        self.assertEqual(calls[0]["model"], "critic-model")
+
+    def test_generate_concepts_attaches_pre_concept_calls(self) -> None:
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_pre", title="A bird", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        pre_call = {"backend": "ollama", "stage": "vision_description", "model": "v", "state": "completed"}
+        with patch.object(pipeline, "request_json", side_effect=ValueError("writer offline")):
+            concepts = pipeline.generate_concepts(
+                [post], "writer-model", 5,
+                generation_calls_by_post={post.id: [pre_call]},
+            )
+        self.assertEqual(len(concepts), 1)
+        self.assertEqual(concepts[0]["execution"]["generation_calls"][0], pre_call)
+
+
 if __name__ == "__main__":
     unittest.main()
