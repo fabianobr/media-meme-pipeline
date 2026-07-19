@@ -718,3 +718,12 @@ Primeiro ciclo completo do fluxo novo (custo de tokens ~zero até o veredito):
   dimensões sem override + swap de retrato) — interrompido via API, relançado no envelope.
   Lição: sempre passar --ltx23-width/height explícitos e nunca pkill com padrão que casa a
   própria invocação.
+- [x] **Ciclo fechado em 7/8 entregues.** O gato-na-hortelã foi descartado após a 6ª
+      ocorrência do MESMO drift entre 2 conceitos distintos: **"gato deitado/dormindo em
+      ambiente doméstico" é um atrator determinístico do LTX distilled — a cena teleporta
+      para "homem de moletom mexendo no celular num quarto"** (2x live-action, 1x versão
+      3D/Pixar), independente de seed, orientação e duração. A hipótese anterior
+      (retrato→paisagem) foi refinada: orientação era fator secundário; o atrator é o
+      conteúdo da cena. Critério novo de seleção: cena de animal dormindo parado em interior
+      doméstico = alto risco de drift; preferir cenas com ação intrínseca ou sujeito em
+      close dominante.
