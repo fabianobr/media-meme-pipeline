@@ -63,7 +63,8 @@ COMFYUI_VIEW_URL = f"{COMFYUI_URL}/view"
 OLLAMA_URL = "http://localhost:11434"
 VIDEO_FPS = 30
 MIN_LTX_VIDEO_SECONDS = 10.0
-CONCEPT_SCHEMA_VERSION = 2
+CONCEPT_SCHEMA_VERSION = 3
+SUPPORTED_CONCEPT_SCHEMA_VERSIONS = frozenset({2, 3})
 PUBLISH_TITLE_MAX_CHARS = 100
 PUBLISH_TOPICS_RANGE = (3, 5)
 PUBLISH_HASHTAGS_RANGE = (4, 8)
@@ -3791,6 +3792,7 @@ def concept_document(post: reddit.RedditPost, concept: dict[str, Any], index: in
             "paths": path_fields,
             "metadata": deepcopy(concept.get("artifact_metadata") or {}),
         },
+        "publish": deepcopy(concept.get("publish") or {}),
         "execution": deepcopy(
             concept.get("execution")
             or {"state": "approved" if concept.get("quality_approved") else "rejected", "attempts": {}}
@@ -3807,11 +3809,15 @@ def validate_concepts_document(document: Any, *, require_artifacts: bool = False
         if not isinstance(item, dict):
             errors.append(f"{prefix} must be an object")
             continue
-        if item.get("schema_version") != CONCEPT_SCHEMA_VERSION:
-            errors.append(f"{prefix}.schema_version must be {CONCEPT_SCHEMA_VERSION}")
+        if item.get("schema_version") not in SUPPORTED_CONCEPT_SCHEMA_VERSIONS:
+            errors.append(
+                f"{prefix}.schema_version must be one of {sorted(SUPPORTED_CONCEPT_SCHEMA_VERSIONS)}"
+            )
         for section in ("post", "joke", "evaluations", "production", "artifacts", "execution"):
             if not isinstance(item.get(section), dict):
                 errors.append(f"{prefix}.{section} must be an object")
+        if "publish" in item and not isinstance(item.get("publish"), dict):
+            errors.append(f"{prefix}.publish must be an object when present")
         joke = item.get("joke") if isinstance(item.get("joke"), dict) else {}
         for field in ("setup", "punchline", "logic"):
             if not isinstance(joke.get(field), str) or not joke.get(field).strip():
@@ -3867,6 +3873,7 @@ def hydrate_concept_record(record: dict[str, Any]) -> tuple[reddit.RedditPost, d
         "narration": deepcopy(production.get("narration") or {}),
         "artifact_metadata": deepcopy(artifacts.get("metadata") or {}),
         "execution": execution,
+        "publish": deepcopy(record.get("publish") or {}),
         "humor_approved": bool((evaluations.get("humor") or {}).get("approved")),
         "quality_approved": bool((evaluations.get("quality") or {}).get("approved")),
     }

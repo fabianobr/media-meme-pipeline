@@ -154,5 +154,63 @@ class PublishTextTests(unittest.TestCase):
         self.assertIn("runtag-01", text)
 
 
+class ContractTests(unittest.TestCase):
+    def _valid_record(self, schema_version: int, publish: dict | None = None) -> dict:
+        record = {
+            "schema_version": schema_version,
+            "id": "t3_abc123:1",
+            "post": {
+                "subreddit": "brasil",
+                "id": "t3_abc123",
+                "title": "Gato no mapa",
+                "author": "u_teste",
+                "url": "https://reddit.com/x",
+                "updated": "",
+                "summary": "",
+                "rank": 1,
+                "media_type": "image",
+                "media_url": "https://i.redd.it/abc123.jpg",
+            },
+            "joke": {"setup": "A", "escalation": "B", "punchline": "C", "logic": "D",
+                     "archetype": "", "rationale": "", "scene_payoff": ""},
+            "evaluations": {"source": {}, "humor": {"approved": True}, "quality": {"approved": True},
+                            "rounds": [], "approved": True},
+            "production": {"image_prompt": "", "source_brief": "", "source_visual_description": "",
+                           "video_script": {}, "narration": {}},
+            "artifacts": {"paths": {}, "metadata": {}},
+            "execution": {"state": "approved", "attempts": {}},
+        }
+        if publish is not None:
+            record["publish"] = publish
+        return record
+
+    def test_current_version_is_3_and_v2_still_validates(self) -> None:
+        self.assertEqual(pipeline.CONCEPT_SCHEMA_VERSION, 3)
+        self.assertEqual(pipeline.validate_concepts_document([self._valid_record(2)]), [])
+        self.assertEqual(pipeline.validate_concepts_document([self._valid_record(3)]), [])
+        self.assertTrue(pipeline.validate_concepts_document([self._valid_record(1)]))
+
+    def test_publish_section_must_be_dict_when_present(self) -> None:
+        self.assertEqual(pipeline.validate_concepts_document([self._valid_record(3, publish={})]), [])
+        errors = pipeline.validate_concepts_document([self._valid_record(3, publish="oops")])
+        self.assertTrue(any("publish" in error for error in errors))
+
+    def test_concept_document_emits_publish(self) -> None:
+        post = make_post()
+        concept = make_concept(publish={"publish_id": "runtag-01", "status": "approved"})
+        document = pipeline.concept_document(post, concept, 1)
+        self.assertEqual(document["schema_version"], 3)
+        self.assertEqual(document["publish"]["publish_id"], "runtag-01")
+        empty = pipeline.concept_document(post, make_concept(), 1)
+        self.assertEqual(empty["publish"], {})
+
+    def test_hydrate_restores_publish(self) -> None:
+        record = self._valid_record(3, publish={"publish_id": "runtag-01", "status": "approved"})
+        _post, concept = pipeline.hydrate_concept_record(record)
+        self.assertEqual(concept["publish"]["publish_id"], "runtag-01")
+        _post, legacy = pipeline.hydrate_concept_record(self._valid_record(2))
+        self.assertEqual(legacy["publish"], {})
+
+
 if __name__ == "__main__":
     unittest.main()
