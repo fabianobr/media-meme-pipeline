@@ -1163,6 +1163,11 @@ def timed_generation_request(
     if round_number is not None:
         call_record["round"] = round_number
     calls.append(call_record)
+    print(
+        f"{stage} round {round_number} started ({call_record['model']}, timeout={timeout}s)"
+        if round_number is not None
+        else f"{stage} started ({call_record['model']}, timeout={timeout}s)"
+    )
     started = time.monotonic()
     try:
         response = request_json("POST", url, json=payload, timeout=timeout)
@@ -1178,6 +1183,11 @@ def timed_generation_request(
     finally:
         call_record["elapsed_seconds"] = round(time.monotonic() - started, 3)
         call_record["finished_at"] = datetime.now().astimezone().isoformat()
+        print(
+            f"{stage} round {round_number} {call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
+            if round_number is not None
+            else f"{stage} {call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
+        )
     return response
 
 
@@ -3732,18 +3742,43 @@ def render_ltx_video_meme(
                 segment_prefix = f"{prefix}-segment-{segment_index}"
                 segment_output = output_path.with_name(f"{output_path.stem}-segment-{segment_index}.mp4")
             segment_seed = seed + segment_index - 1
-            prompt_id = queue_comfy_ltx23_native_video(
-                concept,
-                post,
-                segment_prefix,
-                segment_seed,
-                args,
-                video_prompt_override=segment_prompt_text,
-                frames_override=frames,
-                reference_image_path=current_reference,
-            )
-            ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
-            download_comfy_file(ref, segment_output)
+            render_call_record = {
+                "backend": "comfyui",
+                "stage": "ltx_render",
+                "round": segment_index,
+                "model": (LTX23_I2V_API_WORKFLOW if current_reference else LTX23_API_WORKFLOW).name,
+                "prompt": segment_prompt_text,
+                "options": {
+                    "seed": segment_seed,
+                    "frames": frames,
+                    "fps": args.ltx23_fps,
+                    "width": args.ltx23_width,
+                    "height": args.ltx23_height,
+                    "input_mode": "image-to-video" if current_reference else "text-to-video",
+                },
+                "state": "running",
+            }
+            concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
+                "generation_calls", []
+            ).append(render_call_record)
+            try:
+                prompt_id = queue_comfy_ltx23_native_video(
+                    concept,
+                    post,
+                    segment_prefix,
+                    segment_seed,
+                    args,
+                    video_prompt_override=segment_prompt_text,
+                    frames_override=frames,
+                    reference_image_path=current_reference,
+                )
+                ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
+                download_comfy_file(ref, segment_output)
+            except Exception as exc:  # noqa: BLE001 - failure itself is the useful audit signal here
+                render_call_record["state"] = "failed"
+                render_call_record["error"] = str(exc)
+                raise
+            render_call_record["state"] = "completed"
             segment_paths.append(segment_output)
             segment_records.append(
                 {
@@ -3764,26 +3799,6 @@ def render_ltx_video_meme(
                     ),
                     "input_mode": "image-to-video" if current_reference else "text-to-video",
                     "reference_image_path": str(current_reference) if current_reference else None,
-                }
-            )
-            concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
-                "generation_calls", []
-            ).append(
-                {
-                    "backend": "comfyui",
-                    "stage": "ltx_render",
-                    "round": segment_index,
-                    "model": (LTX23_I2V_API_WORKFLOW if current_reference else LTX23_API_WORKFLOW).name,
-                    "prompt": segment_prompt_text,
-                    "options": {
-                        "seed": segment_seed,
-                        "frames": frames,
-                        "fps": args.ltx23_fps,
-                        "width": args.ltx23_width,
-                        "height": args.ltx23_height,
-                        "input_mode": "image-to-video" if current_reference else "text-to-video",
-                    },
-                    "state": "completed",
                 }
             )
             concept["video_prompt_id"] = prompt_id

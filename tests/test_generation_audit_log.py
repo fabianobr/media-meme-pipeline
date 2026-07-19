@@ -259,6 +259,41 @@ class LtxRenderWiringTests(unittest.TestCase):
         self.assertEqual(calls[0]["options"]["width"], args.ltx23_width)
         self.assertEqual(calls[0]["options"]["height"], args.ltx23_height)
 
+    def test_segment_render_failure_records_failed_call(self) -> None:
+        import tempfile
+
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_ltxfail", title="A toad", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source_photo = tmp_path / "source.jpg"
+            from PIL import Image
+            Image.new("RGB", (100, 100), color="green").save(source_photo)
+            concept = {
+                "top_text": "A", "middle_text": "B", "bottom_text": "C",
+                "source_media_path": str(source_photo),
+            }
+            output_path = tmp_path / "out.mp4"
+            args = pipeline.build_parser().parse_args([
+                "--ltx23-input-mode", "source", "--ltx23-audio-mode", "native",
+                "--output-root", str(tmp_path),
+            ])
+            with patch.object(
+                pipeline, "compose_ltx23_segment_prompts", return_value=["a toad on a leaf, literal prompt"]
+            ), patch.object(
+                pipeline, "queue_comfy_ltx23_native_video", side_effect=RuntimeError("comfyui timeout")
+            ):
+                with self.assertRaises(RuntimeError):
+                    pipeline.render_ltx_video_meme(post, concept, str(source_photo), None, output_path, args)
+        calls = concept["execution"]["generation_calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["state"], "failed")
+        self.assertIn("comfyui timeout", calls[0]["error"])
+        self.assertEqual(calls[0]["prompt"], "a toad on a leaf, literal prompt")
+
 
 if __name__ == "__main__":
     unittest.main()
