@@ -639,3 +639,26 @@ e cada uma mudou o próximo passo:
       injetar o traço explicitamente no prompt em vez de confiar só no `visual_summary`.
       Lote final: 4/4 conceitos do ciclo 3 entregues (piscina, gato no sol, gato bicolor,
       bezerro highland).
+
+## Pivô de arquitetura: "foto real narrada" (2026-07-18)
+
+Após o veredito "não mudou nada, está muito ruim" nos 4 vídeos do ciclo 3, o usuário mandou
+rever o plano inteiro. Plano aprovado (`~/.claude/plans/linear-wiggling-swing.md`) com
+diagnóstico estrutural: re-gerar a imagem destrói o ativo (foto real), o áudio nativo do LTX
+erra PT-BR sempre, áudio+vídeo acoplados encarecem cada iteração de texto, e a calibração de
+duração era loteria. Stress-test por agente achou que ~70% da nova arquitetura já existia no
+código (input-mode source, stack TTS/mux legado, zoompan).
+
+Implementado em 4 commits:
+1. **Full-res + gate de resolução**: preview.redd.it→i.redd.it (gato bicolor: 140px→1536×2048
+   confirmado ao vivo); curadoria reprova lado menor <640px.
+2. **TTS local plugável (Piper default)**: pronúncia de "salão" correta (a palavra que o LTX
+   sempre errava); respelling de estrangeirismos; `frames_for_narration` deriva a duração do
+   vídeo do áudio MEDIDO — fim da loteria palavras→duração.
+3. **Engine photomotion (Tier 1)**: foto real, cortes SECOS por frase (nunca Ken Burns
+   contínuo), legendas por frase, narração com delays medidos. CPU, segundos por vídeo.
+4. **ltx23 audio-mode tts (Tier 2)**: I2V da foto real só-vídeo, prompt sem voice-over,
+   trilha substituída pela narração medida no mux.
+
+Validação em curso: Fase A (photomotion nos 4 textos aprovados), Fase B (Tier 2 nos mesmos),
+Fase C (página HTML foto|Tier1|Tier2 para o veredito único que fecha o tier default e a voz).
