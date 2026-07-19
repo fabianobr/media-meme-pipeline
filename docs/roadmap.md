@@ -727,3 +727,8 @@ Primeiro ciclo completo do fluxo novo (custo de tokens ~zero até o veredito):
       conteúdo da cena. Critério novo de seleção: cena de animal dormindo parado em interior
       doméstico = alto risco de drift; preferir cenas com ação intrínseca ou sujeito em
       close dominante.
+- [x] **VEREDITO: os 7 aprovados.** Primeiro lote em escala da arquitetura nova com aprovação
+      integral — incluindo a lane de notícias completa (figura pública real animada aprovada:
+      Deschamps vira exemplar no baseline). Placar do ciclo: 8/8 textos aprovados, 7/8
+      renders aprovados, 1 descarte com achado (atrator de drift). O fluxo
+      curadoria→texto-free→veredito→render→verificação está operacional de ponta a ponta.
