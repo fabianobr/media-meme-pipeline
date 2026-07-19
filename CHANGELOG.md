@@ -8,6 +8,11 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 ## [Unreleased]
 
 ### Added
+- Arquitetura "foto real narrada": engine `photomotion` (foto real, cortes secos por frase,
+  legendas, narração TTS local — CPU), modo `--ltx23-audio-mode tts` (I2V da foto real
+  só-vídeo com trilha TTS medida no mux), TTS plugável `--tts-backend piper|edge` com Piper
+  local como default, contagem de frames derivada da duração real da narração, upgrade de
+  URLs preview→i.redd.it e gate de resolução ≥640px na curadoria.
 - Checkpoint incremental em `generate_concepts()`: `concepts.json` parcial é persistido após
   cada conceito concluído (best-effort), eliminando a perda do lote inteiro quando um timeout
   ou kill interrompe a rodada no meio.

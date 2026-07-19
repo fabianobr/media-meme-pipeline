@@ -662,3 +662,15 @@ Implementado em 4 commits:
 
 Validação em curso: Fase A (photomotion nos 4 textos aprovados), Fase B (Tier 2 nos mesmos),
 Fase C (página HTML foto|Tier1|Tier2 para o veredito único que fecha o tier default e a voz).
+- [x] **Validação Fases A e B concluídas e entregues.** Fase A (photomotion): 4/4 em minutos
+      de CPU, narração verbatim — "salão", "lançamento", "energia solar" corretos (as
+      palavras que o áudio nativo sempre quebrou). Fase B (Tier 2, I2V da foto real + mux
+      TTS): 3/4 passaram na inspeção — o gato quimera REAL com divisão de cor e heterocromia
+      preservadas (a âncora que a re-geração destruiu 3x), o bezerro highland REAL se
+      movendo, a piscina real com câmera sobre as naves. Derivação de frames do áudio medido
+      funcionou ao vivo ("narration: 8.96s measured → 225 frames"). 1/4 falhou: gato-no-sol
+      driftou pela 3ª vez pro MESMO tipo de cena (homem com celular) — **padrão novo mapeado:
+      fonte retrato extremo (640×1137) espremida em render paisagem 768×448 quebra a
+      ancoragem do I2V; mitigação futura: casar a orientação do render com a da fonte** —
+      fallback Tier 1 usado por design. Aguardando veredito do usuário: tier default, voz
+      (piper vs edge), aprovação dos memes.
