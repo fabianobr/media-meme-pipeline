@@ -1280,6 +1280,9 @@ def generate_publish_metadata(
     final failure is recorded as status=failed — values are never fabricated."""
 
     prompt = compose_publish_prompt(post, concept)
+    generation_calls = concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
+        "generation_calls", []
+    )
     last_issues: list[str] = []
     for attempt in range(1, max_attempts + 1):
         payload = {
@@ -1292,7 +1295,10 @@ def generate_publish_metadata(
             "options": {"temperature": 0.4, "num_predict": 700},
         }
         try:
-            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
+            data = timed_generation_request(
+                generation_calls, backend="ollama", stage="publish_metadata", round_number=attempt,
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
             content = (data.get("message") or {}).get("content") or ""
             candidate = normalize_publish_candidate(extract_json_object(content))
             issues = publish_metadata_issues(candidate)

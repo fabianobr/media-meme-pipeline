@@ -136,6 +136,21 @@ class PublishGenerationTests(unittest.TestCase):
         self.assertEqual(publish["status"], "approved")
         self.assertEqual(publish["attempts"], 2)
 
+    def test_records_generation_calls_on_concept_including_failed_attempts(self) -> None:
+        bad = {"message": {"content": "not json at all"}}
+        good = self._ollama_reply(VALID_CANDIDATE)
+        concept = make_concept()
+        with patch.object(pipeline, "request_json", side_effect=[bad, good]):
+            pipeline.generate_publish_metadata(
+                make_post(), concept, "runtag-01", "gemma4:31b", timeout=60
+            )
+        calls = concept["execution"]["generation_calls"]
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0]["stage"], "publish_metadata")
+        self.assertEqual(calls[0]["state"], "completed")
+        self.assertEqual(calls[0]["response_preview"], "not json at all")
+        self.assertEqual(calls[1]["state"], "completed")
+
 
 class PublishTextTests(unittest.TestCase):
     def test_render_publish_text_has_all_blocks(self) -> None:
