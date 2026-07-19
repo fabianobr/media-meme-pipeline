@@ -31,6 +31,10 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 - Contrato de onboarding reproduzível (`scripts/check_environment.py`, `scripts/bootstrap.sh`).
 
 ### Changed
+- Defaults do render mudados para a receita validada pelo usuário (2026-07-18):
+  `--ltx23-input-mode source` (anima a foto real baixada, não uma imagem re-gerada) e
+  `--ltx23-audio-mode tts` (narração Piper local medida no lugar do áudio nativo). Render
+  segue a orientação da foto-fonte (retrato→retrato).
 - Funil de humor recalibrado para voz narrativa: regra determinística rejeita diálogo cujo
   setup+escalada apenas descrevem a cena (≥60% de overlap com a fonte); prompt do escritor e
   rubrica dos críticos exigem narrador com opinião (suspeita/ironia/reação) em vez de

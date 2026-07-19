@@ -4102,8 +4102,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ltx23-input-mode",
         choices=("image", "source", "prompt"),
-        default="image",
-        help="image uses the generated clean base image as the LTX 2.3 I2V reference; source uses the downloaded source image; prompt keeps the T2V validation path.",
+        default="source",
+        help="source (default, user-validated 2026-07-18) animates the real downloaded photo; image uses the generated clean base image; prompt keeps the T2V validation path.",
     )
     parser.add_argument("--ltx23-lora-name", default=DEFAULT_LTX23_LORA)
     parser.add_argument("--ltx23-lora-strength", type=float, default=0.5)
@@ -4115,7 +4115,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ltx23-audio-mode",
         choices=("native", "tts"),
-        default="native",
+        default="tts",
         help=(
             "native keeps LTX's own audio (unreliable PT-BR pronunciation); tts renders video-only "
             "and muxes a measured local-TTS narration, deriving the frame count from the audio."

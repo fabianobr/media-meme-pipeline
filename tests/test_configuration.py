@@ -22,10 +22,14 @@ class ServiceUrlTests(unittest.TestCase):
         self.assertFalse(pipeline.build_parser().parse_args([]).telegram)
         self.assertTrue(pipeline.build_parser().parse_args(["--telegram"]).telegram)
 
-    def test_ltx23_defaults_to_image_to_video(self) -> None:
+    def test_ltx23_defaults_to_real_photo_with_tts_narration(self) -> None:
+        # User-validated recipe (2026-07-18): animate the real source photo, replace the
+        # unreliable native audio with a measured local-TTS narration.
         args = pipeline.build_parser().parse_args([])
         self.assertEqual(args.video_engine, "ltx23")
-        self.assertEqual(args.ltx23_input_mode, "image")
+        self.assertEqual(args.ltx23_input_mode, "source")
+        self.assertEqual(args.ltx23_audio_mode, "tts")
+        self.assertEqual(args.tts_backend, "piper")
 
     def test_environment_overrides_localhost(self) -> None:
         args = argparse.Namespace(ollama_url=None, comfyui_url=None, n8n_url=None)

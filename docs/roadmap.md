@@ -674,3 +674,11 @@ Fase C (página HTML foto|Tier1|Tier2 para o veredito único que fecha o tier de
       ancoragem do I2V; mitigação futura: casar a orientação do render com a da fonte** —
       fallback Tier 1 usado por design. Aguardando veredito do usuário: tier default, voz
       (piper vs edge), aprovação dos memes.
+- [x] **VEREDITO DO USUÁRIO: "ok para os 3" — pivô validado nos 3 eixos** (piada, voz Piper,
+      movimento) nos 3 vídeos Tier 2. Também definiu: "vídeos ok, fotos em movimento não" —
+      Tier 2 é o formato ÚNICO de entrega; photomotion rebaixado a prévia interna. Os 3
+      vídeos aprovados viraram baseline (`reference-baseline/APPROVED-pivot-*.mp4`).
+      **Defaults do pipeline atualizados para a receita validada**: `--ltx23-input-mode
+      source` + `--ltx23-audio-mode tts` + `--tts-backend piper` são agora o caminho padrão.
+      Fix de orientação (fonte retrato → render retrato) commitado; retry do gato-no-sol em
+      andamento.
