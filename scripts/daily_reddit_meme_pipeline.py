@@ -64,6 +64,9 @@ OLLAMA_URL = "http://localhost:11434"
 VIDEO_FPS = 30
 MIN_LTX_VIDEO_SECONDS = 10.0
 CONCEPT_SCHEMA_VERSION = 2
+PUBLISH_TITLE_MAX_CHARS = 100
+PUBLISH_TOPICS_RANGE = (3, 5)
+PUBLISH_HASHTAGS_RANGE = (4, 8)
 MAX_HUMOR_ROUNDS = 3
 MAX_CONCEPTS_PER_POST = 5
 VALID_STAGE_STATES = {"pending", "running", "approved", "rejected", "failed"}
@@ -1113,6 +1116,169 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return data if isinstance(data, dict) else None
+
+
+def normalize_publish_candidate(payload: Any) -> dict[str, Any]:
+    """Best-effort cleanup before validation: trim strings, prefix hashtags, dedupe."""
+
+    if not isinstance(payload, dict):
+        return {}
+    candidate = dict(payload)
+    for field in ("title", "description"):
+        if isinstance(candidate.get(field), str):
+            candidate[field] = candidate[field].strip()
+    topics = candidate.get("interest_topics")
+    if isinstance(topics, list):
+        candidate["interest_topics"] = [str(item).strip() for item in topics if str(item).strip()]
+    hashtags = candidate.get("hashtags")
+    if isinstance(hashtags, list):
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in hashtags:
+            tag = str(item).strip().replace(" ", "")
+            if not tag:
+                continue
+            if not tag.startswith("#"):
+                tag = f"#{tag}"
+            if tag.lower() in seen:
+                continue
+            seen.add(tag.lower())
+            cleaned.append(tag)
+        candidate["hashtags"] = cleaned
+    return candidate
+
+
+def publish_metadata_issues(payload: Any) -> list[str]:
+    """Deterministic gate for model-produced publish metadata. Empty list means valid."""
+
+    if not isinstance(payload, dict):
+        return ["payload must be a JSON object"]
+    issues: list[str] = []
+    title = payload.get("title")
+    if not isinstance(title, str) or not title.strip():
+        issues.append("title is required")
+    elif len(title) > PUBLISH_TITLE_MAX_CHARS:
+        issues.append(f"title exceeds {PUBLISH_TITLE_MAX_CHARS} chars")
+    description = payload.get("description")
+    if not isinstance(description, str) or not description.strip():
+        issues.append("description is required")
+    topics = payload.get("interest_topics")
+    lo, hi = PUBLISH_TOPICS_RANGE
+    if not isinstance(topics, list) or not all(isinstance(item, str) and item.strip() for item in topics):
+        issues.append("interest_topics must be a list of non-empty strings")
+    elif not lo <= len(topics) <= hi:
+        issues.append(f"interest_topics must have {lo}-{hi} items")
+    hashtags = payload.get("hashtags")
+    lo, hi = PUBLISH_HASHTAGS_RANGE
+    if not isinstance(hashtags, list) or not all(
+        isinstance(item, str) and item.startswith("#") and len(item) > 1 for item in hashtags
+    ):
+        issues.append("hashtags must be a list of #-prefixed strings")
+    elif not lo <= len(hashtags) <= hi:
+        issues.append(f"hashtags must have {lo}-{hi} items")
+    return issues
+
+
+def compose_publish_prompt(post: reddit.RedditPost, concept: dict[str, Any]) -> str:
+    return f"""
+Voce cria metadados de publicacao para videos curtos de humor (YouTube Shorts, Instagram Reels, TikTok), em portugues do Brasil.
+
+O video e uma piada narrada em 3 frases sobre uma foto real:
+- Setup: {concept.get('top_text', '')}
+- Escalada: {concept.get('middle_text', '')}
+- Punchline: {concept.get('bottom_text', '')}
+Contexto da foto: {concept.get('source_brief', '')}
+Descricao visual: {concept.get('source_visual_description', '')}
+
+Responda APENAS um objeto JSON neste formato:
+{{
+  "title": "gancho curto e curioso, maximo {PUBLISH_TITLE_MAX_CHARS} caracteres, sem clickbait enganoso",
+  "description": "1 a 3 frases que despertam curiosidade sem entregar a punchline",
+  "interest_topics": ["{PUBLISH_TOPICS_RANGE[0]} a {PUBLISH_TOPICS_RANGE[1]} assuntos em linguagem natural, ex: gatos, humor absurdo"],
+  "hashtags": ["{PUBLISH_HASHTAGS_RANGE[0]} a {PUBLISH_HASHTAGS_RANGE[1]} hashtags misturando populares e especificas do tema"]
+}}
+
+Regras:
+- Nao mencione IA, Reddit nem o processo de producao.
+- Hashtags sem espacos.
+""".strip()
+
+
+def generate_publish_metadata(
+    post: reddit.RedditPost,
+    concept: dict[str, Any],
+    publish_id: str,
+    model: str,
+    timeout: int,
+    max_attempts: int = 3,
+) -> dict[str, Any]:
+    """Publish metadata via local Ollama. Off-schema output is rejected and retried; the
+    final failure is recorded as status=failed — values are never fabricated."""
+
+    prompt = compose_publish_prompt(post, concept)
+    last_issues: list[str] = []
+    for attempt in range(1, max_attempts + 1):
+        payload = {
+            "model": model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": "Voce escreve metadados de publicacao em pt-BR e responde apenas JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            "options": {"temperature": 0.4, "num_predict": 700},
+        }
+        try:
+            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
+            content = (data.get("message") or {}).get("content") or ""
+            candidate = normalize_publish_candidate(extract_json_object(content))
+            issues = publish_metadata_issues(candidate)
+        except Exception as exc:  # noqa: BLE001 - each failed round-trip is one attempt
+            issues = [str(exc)]
+            candidate = {}
+        if not issues:
+            hashtags = list(candidate["hashtags"])
+            return {
+                "publish_id": publish_id,
+                "language": "pt-BR",
+                "title": candidate["title"],
+                "description": candidate["description"],
+                "description_with_hashtags": f"{candidate['description']}\n\n{' '.join(hashtags)}",
+                "interest_topics": list(candidate["interest_topics"]),
+                "hashtags": hashtags,
+                "model": model,
+                "status": "approved",
+                "attempts": attempt,
+            }
+        last_issues = issues
+    return {
+        "publish_id": publish_id,
+        "language": "pt-BR",
+        "model": model,
+        "status": "failed",
+        "issues": last_issues,
+        "attempts": max_attempts,
+    }
+
+
+def render_publish_text(publish: dict[str, Any]) -> str:
+    """Paste-ready text block for manual publishing on the three platforms."""
+
+    return "\n".join(
+        [
+            f"TITULO: {publish.get('title', '')}",
+            "",
+            "DESCRICAO:",
+            str(publish.get("description", "")),
+            "",
+            "DESCRICAO COM HASHTAGS (TikTok/Reels):",
+            str(publish.get("description_with_hashtags", "")),
+            "",
+            f"ASSUNTOS: {', '.join(publish.get('interest_topics') or [])}",
+            f"HASHTAGS: {' '.join(publish.get('hashtags') or [])}",
+            "",
+            f"ID: {publish.get('publish_id', '')}",
+        ]
+    )
 
 
 def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> list[str]:
