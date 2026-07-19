@@ -3775,6 +3775,25 @@ def send_telegram_album(paths: list[Path], summary: str) -> None:
     response.raise_for_status()
 
 
+def send_telegram_videos(entries: list[tuple[Path, str]]) -> None:
+    """Send publish-ready 9:16 videos, one message each, caption = paste-ready text."""
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    raw_users = os.environ.get("TELEGRAM_ALLOWED_USERS", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", raw_users.split(",")[0].strip() if raw_users else "").strip()
+    if not token or not chat_id:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID/TELEGRAM_ALLOWED_USERS are required")
+    for path, caption in entries:
+        with path.open("rb") as handle:
+            response = requests.post(
+                f"https://api.telegram.org/bot{token}/sendVideo",
+                data={"chat_id": chat_id, "caption": caption[:1024], "supports_streaming": True},
+                files={"video": (path.name, handle, "video/mp4")},
+                timeout=300,
+            )
+        response.raise_for_status()
+
+
 def build_summary(posts: list[reddit.RedditPost], concepts: list[dict[str, str]]) -> str:
     lines = ["Memes Reddit do dia - revisao", ""]
     for idx, (post, concept) in enumerate(zip(posts, concepts), 1):
@@ -4638,10 +4657,22 @@ def main() -> int:
     (run_dir / "summary.md").write_text(summary, encoding="utf-8")
     (run_dir / "human-review.md").write_text(build_human_review_sheet(posts, concepts), encoding="utf-8")
 
-    if final_paths and args.telegram:
-        send_telegram_album(final_paths, summary)
-        print(f"Telegram sent: {len(final_paths)} images")
-    elif not args.telegram:
+    publish_videos: list[tuple[Path, str]] = []
+    for concept in concepts:
+        publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+        final_916 = str(concept.get("final_916_path") or "")
+        if publish.get("status") == "approved" and final_916 and Path(final_916).is_file():
+            caption = f"{publish.get('title', '')}\n\n{publish.get('description_with_hashtags', '')}"
+            publish_videos.append((Path(final_916), caption))
+
+    if args.telegram:
+        if final_paths:
+            send_telegram_album(final_paths, summary)
+            print(f"Telegram sent: {len(final_paths)} images")
+        if publish_videos:
+            send_telegram_videos(publish_videos)
+            print(f"Telegram sent: {len(publish_videos)} publish videos")
+    else:
         print("Telegram disabled by default; not sending. Use --telegram to opt in.")
 
     print(f"Artifacts: {run_dir}")

@@ -294,5 +294,34 @@ class PipelineWiringTests(unittest.TestCase):
             self.assertNotIn("publish_json_path", concept)
 
 
+class TelegramPublishTests(unittest.TestCase):
+    def test_send_telegram_videos_truncates_caption_at_1024(self) -> None:
+        import os
+        import tempfile
+
+        calls = []
+
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                pass
+
+        def fake_post(url, **kwargs):
+            calls.append((url, kwargs))
+            return FakeResponse()
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4") as fh:
+            entries = [(Path(fh.name), "T" * 2000)]
+            with patch.dict(
+                os.environ, {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_CHAT_ID": "123"}
+            ), patch.object(pipeline.requests, "post", side_effect=fake_post):
+                pipeline.send_telegram_videos(entries)
+        self.assertEqual(len(calls), 1)
+        url, kwargs = calls[0]
+        self.assertIn("sendVideo", url)
+        self.assertEqual(kwargs["data"]["chat_id"], "123")
+        self.assertEqual(len(kwargs["data"]["caption"]), 1024)
+        self.assertIn("video", kwargs["files"])
+
+
 if __name__ == "__main__":
     unittest.main()
