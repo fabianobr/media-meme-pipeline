@@ -249,5 +249,50 @@ class CurationPortraitTests(unittest.TestCase):
         self.assertEqual([item["post"]["id"] for item in ordered], ["b", "d", "a", "c", "e"])
 
 
+class PipelineWiringTests(unittest.TestCase):
+    def test_publish_model_flag_defaults_to_none(self) -> None:
+        args = pipeline.build_parser().parse_args([])
+        self.assertIsNone(args.publish_model)
+        args = pipeline.build_parser().parse_args(["--publish-model", "qwen3:14b"])
+        self.assertEqual(args.publish_model, "qwen3:14b")
+
+    def test_prepare_publish_package_writes_json_and_txt(self) -> None:
+        import json
+        import tempfile
+
+        publish = {
+            "publish_id": "runtag-01",
+            "language": "pt-BR",
+            "title": "Titulo",
+            "description": "Desc.",
+            "description_with_hashtags": "Desc.\n\n#a #b #c #d",
+            "interest_topics": ["a", "b", "c"],
+            "hashtags": ["#a", "#b", "#c", "#d"],
+            "model": "m",
+            "status": "approved",
+            "attempts": 1,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            concept = make_concept(publish=publish)
+            package_dir = pipeline.prepare_publish_package(Path(tmp), 1, "gato-no-mapa", concept)
+            self.assertEqual(package_dir, Path(tmp) / "01-gato-no-mapa")
+            data = json.loads((package_dir / "publish.json").read_text(encoding="utf-8"))
+            self.assertEqual(data["publish_id"], "runtag-01")
+            text = (package_dir / "publish.txt").read_text(encoding="utf-8")
+            self.assertIn("Titulo", text)
+            self.assertEqual(concept["publish_json_path"], str(package_dir / "publish.json"))
+            self.assertEqual(concept["publish_text_path"], str(package_dir / "publish.txt"))
+
+    def test_prepare_publish_package_skips_failed_publish(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            concept = make_concept(publish={"status": "failed", "publish_id": "x", "issues": ["bad"]})
+            package_dir = pipeline.prepare_publish_package(Path(tmp), 1, "slug", concept)
+            self.assertIsNone(package_dir)
+            self.assertFalse((Path(tmp) / "01-slug").exists())
+            self.assertNotIn("publish_json_path", concept)
+
+
 if __name__ == "__main__":
     unittest.main()

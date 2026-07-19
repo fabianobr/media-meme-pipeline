@@ -1282,6 +1282,24 @@ def render_publish_text(publish: dict[str, Any]) -> str:
     )
 
 
+def prepare_publish_package(run_dir: Path, index: int, slug: str, concept: dict[str, Any]) -> Path | None:
+    """Write publish.json + publish.txt into the per-video package directory. Returns the
+    directory, or None when the concept has no approved publish metadata."""
+
+    publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+    if publish.get("status") != "approved":
+        return None
+    package_dir = run_dir / f"{index:02d}-{slug}"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    publish_json_path = package_dir / "publish.json"
+    write_json(publish_json_path, publish)
+    publish_text_path = package_dir / "publish.txt"
+    publish_text_path.write_text(render_publish_text(publish), encoding="utf-8")
+    concept["publish_json_path"] = str(publish_json_path)
+    concept["publish_text_path"] = str(publish_text_path)
+    return package_dir
+
+
 def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> list[str]:
     setup = str(candidate.get("setup") or "").strip()
     escalation = str(candidate.get("escalation") or "").strip()
@@ -4227,6 +4245,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-critic-model", default="gemma3:12b")
     parser.add_argument("--humor-model", default="gemma4:31b")
     parser.add_argument(
+        "--publish-model",
+        default=None,
+        help="Ollama model for publish metadata (title/description/topics/hashtags); defaults to --humor-model.",
+    )
+    parser.add_argument(
         "--humor-critic-model",
         default="llama3:latest",
         help="Independent Ollama model used only to review humor candidates.",
@@ -4485,6 +4508,23 @@ def main() -> int:
                 "approved" if approved else "rejected",
                 str((concept.get("quality_review") or {}).get("reason", "")),
             )
+    publish_model = args.publish_model or args.humor_model
+    for idx, (post, concept) in enumerate(zip(posts, concepts), 1):
+        if not (concept.get("humor_approved") and concept.get("quality_approved")):
+            continue
+        existing = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+        if existing.get("status") == "approved":
+            prepare_publish_package(run_dir, idx, slugify(post.title), concept)
+            continue
+        print(f"Generating publish metadata {idx}/{len(posts)}: {post.title[:60]}")
+        concept["publish"] = generate_publish_metadata(
+            post, concept, f"{run_tag}-{idx:02d}", publish_model, args.concept_timeout
+        )
+        if concept["publish"]["status"] == "approved":
+            prepare_publish_package(run_dir, idx, slugify(post.title), concept)
+        else:
+            issues = "; ".join(concept["publish"].get("issues") or [])
+            print(f"WARN publish metadata failed (render continues): {issues[:200]}")
     persist_concepts(run_dir / "concepts.json", posts, concepts)
     if not approved_resume:
         flush_ollama(args.ollama_model)
@@ -4498,6 +4538,11 @@ def main() -> int:
             args.ollama_model, args.humor_model, args.humor_critic_model, args.humor_second_critic_model
         }:
             flush_ollama(args.vision_model)
+        if publish_model not in {
+            args.ollama_model, args.humor_model, args.humor_critic_model,
+            args.humor_second_critic_model, args.vision_model,
+        }:
+            flush_ollama(publish_model)
     if not args.no_render:
         free_comfy_memory()
 
@@ -4569,6 +4614,15 @@ def main() -> int:
                             render_ltx_video_meme(post, concept, source_media_path, final_path, video_output_path, args)
                     concept["video_path"] = str(video_output_path)
                     concept["artifact_metadata"] = probe_video_artifact(video_output_path)
+                    publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+                    if publish.get("status") == "approved":
+                        package_dir = run_dir / f"{idx:02d}-{slug}"
+                        package_dir.mkdir(parents=True, exist_ok=True)
+                        try:
+                            final_916_path = format_video_916(video_output_path, package_dir / "final_916.mp4")
+                            concept["final_916_path"] = str(final_916_path)
+                        except Exception as exc:  # noqa: BLE001 - native validated MP4 stays the deliverable
+                            print(f"WARN 9:16 formatting failed; keeping native MP4: {exc}")
                     video_paths.append(video_output_path)
                 if final_path is not None:
                     final_paths.append(final_path)
