@@ -1188,6 +1188,7 @@ O video e uma piada narrada em 3 frases sobre uma foto real:
 - Setup: {concept.get('top_text', '')}
 - Escalada: {concept.get('middle_text', '')}
 - Punchline: {concept.get('bottom_text', '')}
+Titulo do post original: {post.title}
 Contexto da foto: {concept.get('source_brief', '')}
 Descricao visual: {concept.get('source_visual_description', '')}
 
@@ -4528,6 +4529,7 @@ def main() -> int:
                 str((concept.get("quality_review") or {}).get("reason", "")),
             )
     publish_model = args.publish_model or args.humor_model
+    publish_generated = False
     for idx, (post, concept) in enumerate(zip(posts, concepts), 1):
         if not (concept.get("humor_approved") and concept.get("quality_approved")):
             continue
@@ -4539,11 +4541,14 @@ def main() -> int:
         concept["publish"] = generate_publish_metadata(
             post, concept, f"{run_tag}-{idx:02d}", publish_model, args.concept_timeout
         )
+        publish_generated = True
         if concept["publish"]["status"] == "approved":
             prepare_publish_package(run_dir, idx, slugify(post.title), concept)
         else:
             issues = "; ".join(concept["publish"].get("issues") or [])
             print(f"WARN publish metadata failed (render continues): {issues[:200]}")
+    if publish_generated:
+        flush_ollama(publish_model)
     persist_concepts(run_dir / "concepts.json", posts, concepts)
     if not approved_resume:
         flush_ollama(args.ollama_model)
@@ -4557,11 +4562,6 @@ def main() -> int:
             args.ollama_model, args.humor_model, args.humor_critic_model, args.humor_second_critic_model
         }:
             flush_ollama(args.vision_model)
-        if publish_model not in {
-            args.ollama_model, args.humor_model, args.humor_critic_model,
-            args.humor_second_critic_model, args.vision_model,
-        }:
-            flush_ollama(publish_model)
     if not args.no_render:
         free_comfy_memory()
 
