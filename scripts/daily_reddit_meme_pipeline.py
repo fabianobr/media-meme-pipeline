@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import reddit_meme_dry_run as reddit
 
@@ -2755,11 +2755,26 @@ def make_video_audio(text: str, output_path: Path, duration: float) -> Path:
     return output_path
 
 
+PIPER_LOANWORDS = {
+    # Piper phonemizes pt-BR literally, so common English loanwords need phonetic respelling
+    # or they come out letter-by-letter ("a-vê-ene-bê") or hispanicized ("estaróis").
+    "airbnb": "érbiénbí",
+    "star wars": "istár uórs",
+    "wi-fi": "uai fai",
+    "wifi": "uai fai",
+    "tiktok": "tique toque",
+    "youtube": "iutúbi",
+    "reddit": "rédite",
+}
+
+
 def normalize_piper_text(value: str) -> str:
     """Prepare dialogue text for Piper: it phonemizes literally, so ALL-CAPS meme text and
     written interjections ("HMMM", "...") need lowering/softening or they come out spelled."""
 
     value = " ".join((value or "").split()).lower()
+    for loanword, phonetic in PIPER_LOANWORDS.items():
+        value = re.sub(rf"\b{re.escape(loanword)}\b", phonetic, value)
     value = re.sub(r"\bh+u?m+\b", "humm", value)
     value = value.replace("...", ", ")
     return value[:240] or "meme gerado para revisão."
@@ -2986,6 +3001,170 @@ def make_ltx_caption_overlay(
     return output_path
 
 
+def photomotion_beat_plan(
+    segment_durations: list[float],
+    lead: float = 0.4,
+    gap: float = 0.35,
+    tail: float = 1.2,
+) -> tuple[list[tuple[float, float]], float]:
+    """Pure beat math for the narrated-photo engine.
+
+    Returns (shots, total): one (audio_start, shot_duration) pair per narration segment and
+    the total video duration. Shot 1 absorbs the lead-in, the last shot absorbs the tail, and
+    cuts are hard (no crossfade) — the rhythm comes from the sentence boundaries.
+    """
+
+    if not segment_durations:
+        raise ValueError("photomotion requires at least one narration segment")
+    starts: list[float] = []
+    cursor = lead
+    for duration in segment_durations:
+        starts.append(cursor)
+        cursor += duration + gap
+    total = cursor - gap + tail
+    shots: list[tuple[float, float]] = []
+    for index, start in enumerate(starts):
+        shot_start = 0.0 if index == 0 else start
+        shot_end = starts[index + 1] if index + 1 < len(starts) else total
+        shots.append((start, shot_end - shot_start))
+    return shots, total
+
+
+def photomotion_shot_still(
+    photo: Image.Image,
+    caption: str,
+    output_path: Path,
+    font_path: Path,
+    zoom: float,
+    focus_y: float,
+    canvas: tuple[int, int] = (720, 1280),
+) -> Path:
+    """One shot = one still: blurred-fill vertical canvas, punch-in crop of the real photo,
+    caption block burned at the bottom. Meme text stays legible with the video muted."""
+
+    canvas_w, canvas_h = canvas
+    background = photo.copy().convert("RGB")
+    bg_scale = max(canvas_w / background.width, canvas_h / background.height)
+    background = background.resize(
+        (int(background.width * bg_scale), int(background.height * bg_scale)), Image.Resampling.LANCZOS
+    )
+    left = (background.width - canvas_w) // 2
+    top = (background.height - canvas_h) // 2
+    background = background.crop((left, top, left + canvas_w, top + canvas_h))
+    background = background.filter(ImageFilter.GaussianBlur(24))
+
+    crop_w = int(photo.width / zoom)
+    crop_h = int(crop_w * canvas_h / canvas_w * 0.72)
+    crop_h = min(crop_h, photo.height)
+    crop_x = (photo.width - crop_w) // 2
+    crop_y = int((photo.height - crop_h) * min(max(focus_y, 0.0), 1.0))
+    foreground = photo.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h)).convert("RGB")
+    fg_target_w = canvas_w
+    fg_target_h = int(foreground.height * fg_target_w / foreground.width)
+    foreground = foreground.resize((fg_target_w, fg_target_h), Image.Resampling.LANCZOS)
+    frame = background
+    frame.paste(foreground, (0, max(0, (canvas_h - fg_target_h) // 2 - canvas_h // 12)))
+
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    shade = ImageDraw.Draw(overlay)
+    shade.rectangle((0, int(canvas_h * 0.74), canvas_w, canvas_h), fill=(0, 0, 0, 150))
+    draw = ImageDraw.Draw(overlay)
+    text_size = max(30, canvas_w // 12)
+    margin = max(24, canvas_w // 22)
+    draw_video_text_block(draw, caption, canvas_h - margin, canvas_w, font_path, text_size, anchor_bottom=True)
+    composed = Image.alpha_composite(frame.convert("RGBA"), overlay).convert("RGB")
+    composed.save(output_path)
+    return output_path
+
+
+def render_photomotion_meme(
+    source_photo_path: Path,
+    concept: dict[str, Any],
+    output_path: Path,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Tier 1 of the narrated-real-photo pipeline: the actual source photo, hard cuts and
+    punch-ins on sentence boundaries, captions, and a measured local-TTS narration. CPU-only,
+    seconds to produce — serves as animatic preview and as fallback when I2V drifts."""
+
+    sentences = [
+        str(concept.get("top_text") or "").strip(),
+        str(concept.get("middle_text") or "").strip(),
+        str(concept.get("bottom_text") or "").strip(),
+    ]
+    sentences = [sentence for sentence in sentences if sentence]
+    if not sentences:
+        raise RuntimeError("photomotion requires setup/escalation/punchline text")
+
+    backend = getattr(args, "tts_backend", "piper")
+    workdir = output_path.parent
+    audio_paths: list[Path] = []
+    durations: list[float] = []
+    for index, sentence in enumerate(sentences, 1):
+        audio = synthesize_ptbr_speech(
+            sentence, workdir / f"{output_path.stem}-beat{index}.mp3", args.tts_rate, backend
+        )
+        audio_paths.append(audio)
+        durations.append(audio_duration_seconds(audio))
+    shots, total = photomotion_beat_plan(durations)
+
+    photo = Image.open(source_photo_path).convert("RGB")
+    zooms = [(1.0, 0.30), (1.35, 0.22), (1.7, 0.30)]
+    segment_paths: list[Path] = []
+    for index, ((audio_start, shot_duration), sentence) in enumerate(zip(shots, sentences), 1):
+        zoom, focus_y = zooms[(index - 1) % len(zooms)]
+        still = photomotion_shot_still(
+            photo, sentence, workdir / f"{output_path.stem}-shot{index}.png", args.font, zoom, focus_y
+        )
+        segment = workdir / f"{output_path.stem}-shot{index}.mp4"
+        run_ffmpeg(
+            [
+                "-loop", "1", "-t", f"{shot_duration:.3f}", "-i", str(still),
+                "-vf", f"format=yuv420p,fps={VIDEO_FPS}",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-an",
+                str(segment),
+            ]
+        )
+        segment_paths.append(segment)
+
+    silent_concat = workdir / f"{output_path.stem}-silent.mp4"
+    concatenate_video_segments(segment_paths, silent_concat)
+
+    delay_filters = []
+    mix_labels = []
+    for index, (audio_start, _shot) in enumerate(shots, 1):
+        delay_ms = int(audio_start * 1000)
+        delay_filters.append(f"[{index}:a]adelay={delay_ms}|{delay_ms}[n{index}]")
+        mix_labels.append(f"[n{index}]")
+    filter_complex = (
+        ";".join(delay_filters)
+        + f";{''.join(mix_labels)}amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0,"
+        + f"atrim=0:{total:.3f},apad[aout]"
+    )
+    ffmpeg_args = ["-i", str(silent_concat)]
+    for audio in audio_paths:
+        ffmpeg_args.extend(["-i", str(audio)])
+    ffmpeg_args.extend(
+        [
+            "-filter_complex", filter_complex,
+            "-map", "0:v:0", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-t", f"{total:.3f}", "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    run_ffmpeg(ffmpeg_args)
+    for cleanup in [silent_concat, *segment_paths, *audio_paths]:
+        cleanup.unlink(missing_ok=True)
+    return {
+        "engine": "photomotion",
+        "tts_backend": backend,
+        "segment_durations": [round(value, 3) for value in durations],
+        "shots": [[round(start, 3), round(duration, 3)] for start, duration in shots],
+        "total_duration": round(total, 3),
+    }
+
+
 def finish_ltx_video(
     raw_video_path: Path,
     output_path: Path,
@@ -3119,6 +3298,13 @@ def render_ltx_video_meme(
 ) -> Path:
     prefix = str(output_path.with_suffix("").relative_to(args.output_root.parent))
     seed = int(concept.get("seed") or int(time.time() * 1000) % 2_000_000_000)
+    if args.video_engine == "photomotion":
+        source_reference = Path(concept.get("source_media_path") or _source_media_path or "")
+        if not source_reference.is_file():
+            raise RuntimeError(f"photomotion requires the downloaded source photo: {source_reference}")
+        print("  photomotion: narrated real photo (local TTS, hard cuts, CPU)")
+        concept["photomotion"] = render_photomotion_meme(source_reference, concept, output_path, args)
+        return output_path
     if args.video_engine == "ltx23":
         frames = ltx_valid_frame_count(args.ltx23_frames)
         segment_count = args.ltx23_segments
@@ -3754,9 +3940,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--video-engine",
-        choices=("ltx23", "ltx", "review"),
+        choices=("ltx23", "photomotion", "ltx", "review"),
         default="ltx23",
-        help="ltx23 is native LTX 2.3 audio/video; ltx is legacy LTX 0.9.5; review is local ffmpeg composition only.",
+        help=(
+            "ltx23 is native LTX 2.3 image-to-video; photomotion is the narrated real photo "
+            "(hard cuts + local TTS, CPU only); ltx is legacy LTX 0.9.5; review is local ffmpeg composition."
+        ),
     )
     parser.add_argument("--video-duration", type=float, default=15.0)
     parser.add_argument("--video-size", type=int, default=768)
@@ -4008,11 +4197,12 @@ def main() -> int:
             persist_concepts(run_dir / "concepts.json", posts, concepts)
             try:
                 skip_base_image = args.make_video and (
-                    (args.video_engine == "ltx23" and args.ltx23_input_mode == "prompt")
+                    (args.video_engine == "ltx23" and args.ltx23_input_mode in ("prompt", "source"))
                     or (args.video_engine == "ltx" and args.ltx_input_mode == "prompt")
+                    or args.video_engine == "photomotion"
                 )
                 if skip_base_image:
-                    print("Skipping base image generation; video engine will use text prompt inputs.")
+                    print("Skipping base image generation; video engine works from prompt or real source photo.")
                 else:
                     base_path = run_dir / f"{idx:02d}-{slug}-base.png"
                     final_path = run_dir / f"{idx:02d}-{slug}.png"

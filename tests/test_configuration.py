@@ -512,6 +512,28 @@ class GenerateConceptsCheckpointTests(unittest.TestCase):
             self.assertFalse(concept["humor_approved"])
 
 
+class PhotomotionBeatPlanTests(unittest.TestCase):
+    def test_shots_cover_lead_gaps_and_tail_contiguously(self) -> None:
+        shots, total = pipeline.photomotion_beat_plan([2.0, 3.0, 2.5], lead=0.4, gap=0.35, tail=1.2)
+        self.assertEqual(len(shots), 3)
+        self.assertEqual(shots[0][0], 0.4)  # first audio starts after the lead
+        # shots are contiguous: each shot ends where the next begins, last ends at total
+        self.assertAlmostEqual(shots[0][1], shots[1][0])
+        self.assertAlmostEqual(shots[1][0] + shots[1][1], shots[2][0])
+        self.assertAlmostEqual(shots[2][0] + shots[2][1], total)
+        self.assertAlmostEqual(total, 0.4 + 2.0 + 0.35 + 3.0 + 0.35 + 2.5 + 1.2)
+
+    def test_empty_narration_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            pipeline.photomotion_beat_plan([])
+
+    def test_piper_normalization_lowers_caps_and_respells_loanwords(self) -> None:
+        normalized = pipeline.normalize_piper_text("AIRBNB COM PISCINA, HMMM... STAR WARS")
+        self.assertNotIn("AIRBNB", normalized)
+        self.assertIn("humm", normalized)
+        self.assertNotIn("...", normalized)
+
+
 class VideoScriptSpeciesPreservationTests(unittest.TestCase):
     def _post(self, title: str) -> reddit.RedditPost:
         return reddit.RedditPost(
