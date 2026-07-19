@@ -401,6 +401,89 @@ class SourceSuitabilityTests(unittest.TestCase):
         self.assertEqual(review["scores"]["visual_clarity"], 3.0)
 
 
+class SourceSuitabilityMotionCapTests(unittest.TestCase):
+    def test_open_scene_flag_caps_motion_potential_to_two(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 3, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 2.0)
+        self.assertFalse(result["approved"])  # 2.0 < required minimum of 3
+        self.assertIn("cena aberta", result["reason"])
+
+    def test_open_scene_flag_false_does_not_cap(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+        self.assertTrue(result["approved"])
+
+    def test_open_scene_flag_missing_defaults_to_no_cap(self) -> None:
+        # Backward compatibility: old persisted reviews (before this field existed) must
+        # not retroactively get capped just because the key is absent.
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+
+    def test_open_scene_cap_combines_with_existing_caps(self) -> None:
+        # A source can trip more than one deterministic rule at once; both caps must apply.
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": True,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 3, "text_independence": 4},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 2.0)
+        self.assertEqual(result["scores"]["text_independence"], 2.0)
+
+    def test_assess_source_suitability_schema_requires_open_scene_flag(self) -> None:
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_motion", title="A person in a wide patio", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        review_payload = {
+            "approved": True, "reason": "ok",
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 2, "text_independence": 5},
+            "embedded_text_carries_meaning": False, "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "photo.jpg"
+            pipeline.Image.new("RGB", (32, 32), color="green").save(image_path)
+            with patch.object(
+                pipeline, "request_json",
+                return_value={"message": {"content": pipeline.json.dumps(review_payload)}},
+            ) as mock_request:
+                pipeline.assess_source_suitability(post, image_path, "a woman in a patio", "critic-model", 30)
+        self.assertEqual(mock_request.call_count, 1)
+        _, kwargs = mock_request.call_args
+        payload = kwargs["json"]
+        self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["properties"])
+        self.assertEqual(payload["format"]["properties"]["open_scene_no_intrinsic_motion"]["type"], "boolean")
+        self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["required"])
+
+
 class PopularCurationBacklogTests(unittest.TestCase):
     def _post(self, post_id: str, media_type: str, rank: int) -> reddit.RedditPost:
         return reddit.RedditPost(

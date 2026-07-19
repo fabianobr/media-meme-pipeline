@@ -2671,6 +2671,9 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
         normalized_scores["text_independence"] = min(normalized_scores["text_independence"], 2.0)
         normalized_scores["visual_clarity"] = min(normalized_scores["visual_clarity"], 3.0)
         reason = "colagem de fotos distintas nao serve para I2V de cena unica; " + reason
+    if bool(review.get("open_scene_no_intrinsic_motion")):
+        normalized_scores["motion_potential"] = min(normalized_scores["motion_potential"], 2.0)
+        reason = "cena aberta sem sujeito em close nem elemento intrinsecamente movel; " + reason
     approved = (
         bool(review.get("approved"))
         and normalized_scores["source_match"] >= 4
@@ -2699,6 +2702,7 @@ def assess_source_suitability(
             "approved": {"type": "boolean"},
             "embedded_text_carries_meaning": {"type": "boolean"},
             "multi_photo_collage": {"type": "boolean"},
+            "open_scene_no_intrinsic_motion": {"type": "boolean"},
             "scores": {
                 "type": "object",
                 "properties": {
@@ -2711,7 +2715,10 @@ def assess_source_suitability(
             },
             "reason": {"type": "string"},
         },
-        "required": ["approved", "embedded_text_carries_meaning", "multi_photo_collage", "scores", "reason"],
+        "required": [
+            "approved", "embedded_text_carries_meaning", "multi_photo_collage",
+            "open_scene_no_intrinsic_motion", "scores", "reason",
+        ],
     }
     try:
         with Image.open(image_path) as image:
@@ -2735,11 +2742,14 @@ Pontue de 0 a 5:
 
 Rejeite miniatura que nao mostre a acao do titulo, documento/screenshot dependente de leitura,
 imagem ambigua ou fonte que exigiria inventar personagem, objeto ou local.
-Responda tambem dois campos booleanos obrigatorios, de forma literal:
+Responda tambem tres campos booleanos obrigatorios, de forma literal:
 - embedded_text_carries_meaning: true se a imagem contem legenda, manchete, tweet ou texto
   embutido que carrega o significado do post (a piada so faz sentido lendo esse texto).
 - multi_photo_collage: true se a imagem e uma colagem/lado-a-lado de duas ou mais fotos ou
   pessoas distintas comparadas entre si (I2V anima uma unica cena, nao uma comparacao).
+- open_scene_no_intrinsic_motion: true se a cena é aberta com o sujeito principal pequeno ou
+  distante da câmera, e nada na imagem é intrinsecamente móvel (fogo, água, fumaça, multidão,
+  rosto em close) — nesse caso um modelo I2V não anima nada de verdade e o vídeo fica estático.
 Responda somente JSON.
 Formato exato: {{"approved": false, "scores": {{"source_match": 0, "visual_clarity": 0,
 "motion_potential": 0, "text_independence": 0}}, "reason": "..."}}
