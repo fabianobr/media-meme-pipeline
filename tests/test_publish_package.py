@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import daily_reddit_meme_pipeline as pipeline  # noqa: E402
 import reddit_meme_dry_run as reddit  # noqa: E402
+import reddit_popular_curation as curation  # noqa: E402
 
 
 def make_post(**overrides) -> reddit.RedditPost:
@@ -233,6 +234,19 @@ class Format916Tests(unittest.TestCase):
         self.assertEqual(args[args.index("-map") + 1], "[vout]")
         self.assertIn("0:a?", args)
         self.assertIn("+faststart", joined)
+
+
+class CurationPortraitTests(unittest.TestCase):
+    def test_portrait_entries_come_first_stably(self) -> None:
+        entries = [
+            {"post": {"id": "a"}, "portrait": False},
+            {"post": {"id": "b"}, "portrait": True},
+            {"post": {"id": "c"}, "portrait": False},
+            {"post": {"id": "d"}, "portrait": True},
+            {"post": {"id": "e"}},  # entrada antiga sem o campo: trata como paisagem
+        ]
+        ordered = curation.prioritize_portrait(entries)
+        self.assertEqual([item["post"]["id"] for item in ordered], ["b", "d", "a", "c", "e"])
 
 
 if __name__ == "__main__":
