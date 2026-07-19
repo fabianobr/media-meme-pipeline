@@ -1962,7 +1962,12 @@ def validate_ltx23_prompts(prompts: list[str]) -> list[str]:
     return errors
 
 
-def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, Any], segments: int = 1) -> list[str]:
+def compose_ltx23_segment_prompts(
+    post: reddit.RedditPost,
+    concept: dict[str, Any],
+    segments: int = 1,
+    audio_mode: str = "native",
+) -> list[str]:
     if segments not in (1, 2):
         raise ValueError("ltx23 supports 1 or 2 segments per concept")
     script = concept.get("video_script")
@@ -2016,6 +2021,14 @@ def compose_ltx23_segment_prompts(post: reddit.RedditPost, concept: dict[str, An
         return "Audio: natural Brazilian Portuguese narration with dry comic timing. Quiet indoor room tone."
 
     def segment_prompt(action_text: str, dialogue_text: str) -> str:
+        if audio_mode == "tts":
+            # Narration is synthesized separately and muxed in afterwards; the model gets a
+            # purely visual prompt so no unreliable native speech is generated at all.
+            return (
+                f"{action_text}. {character}. {prop}. {scene}. "
+                f"Camera: {camera}. Keep natural light, sharp focus, and minimal motion. "
+                "One continuous shot. Audio: quiet natural ambient sound of the scene, no speech."
+            )
         return (
             f"{action_text}. {character}. {prop}. {scene}. "
             f"Camera: {camera}. Keep natural light, sharp focus, and minimal motion. "
@@ -3077,6 +3090,84 @@ def photomotion_shot_still(
     return output_path
 
 
+def synthesize_narration_track(
+    concept: dict[str, Any],
+    workdir: Path,
+    stem: str,
+    args: argparse.Namespace,
+) -> tuple[Path, float, dict[str, Any]]:
+    """One narration file for the whole meme: per-sentence local TTS, beat-plan delays,
+    single mixed track. Shared by photomotion review and the ltx23 tts audio mode."""
+
+    sentences = [
+        str(concept.get("top_text") or "").strip(),
+        str(concept.get("middle_text") or "").strip(),
+        str(concept.get("bottom_text") or "").strip(),
+    ]
+    sentences = [sentence for sentence in sentences if sentence]
+    if not sentences:
+        raise RuntimeError("narration requires setup/escalation/punchline text")
+    backend = getattr(args, "tts_backend", "piper")
+    audio_paths: list[Path] = []
+    durations: list[float] = []
+    for index, sentence in enumerate(sentences, 1):
+        audio = synthesize_ptbr_speech(sentence, workdir / f"{stem}-nar{index}.mp3", args.tts_rate, backend)
+        audio_paths.append(audio)
+        durations.append(audio_duration_seconds(audio))
+    shots, total = photomotion_beat_plan(durations)
+    output_path = workdir / f"{stem}-narration.m4a"
+    delay_filters = []
+    mix_labels = []
+    for index, (audio_start, _shot) in enumerate(shots):
+        delay_ms = int(audio_start * 1000)
+        delay_filters.append(f"[{index}:a]adelay={delay_ms}|{delay_ms}[n{index}]")
+        mix_labels.append(f"[n{index}]")
+    filter_complex = (
+        ";".join(delay_filters)
+        + f";{''.join(mix_labels)}amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0,"
+        + f"atrim=0:{total:.3f},apad=pad_dur=0.2[aout]"
+    )
+    ffmpeg_args: list[str] = []
+    for audio in audio_paths:
+        ffmpeg_args.extend(["-i", str(audio)])
+    ffmpeg_args.extend(
+        ["-filter_complex", filter_complex, "-map", "[aout]", "-c:a", "aac", "-b:a", "192k",
+         "-t", f"{total:.3f}", str(output_path)]
+    )
+    run_ffmpeg(ffmpeg_args)
+    for audio in audio_paths:
+        audio.unlink(missing_ok=True)
+    meta = {
+        "tts_backend": backend,
+        "segment_durations": [round(value, 3) for value in durations],
+        "beats": [round(start, 3) for start, _ in shots],
+        "total_duration": round(total, 3),
+    }
+    return output_path, total, meta
+
+
+def finish_ltx23_with_tts(
+    raw_video_path: Path,
+    narration_path: Path,
+    total_duration: float,
+    output_path: Path,
+) -> Path:
+    """Replace the LTX output's audio track with the measured local-TTS narration."""
+
+    run_ffmpeg(
+        [
+            "-i", str(raw_video_path),
+            "-i", str(narration_path),
+            "-map", "0:v:0", "-map", "1:a:0",
+            "-c:v", "copy", "-c:a", "copy",
+            "-t", f"{total_duration:.3f}",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    return output_path
+
+
 def render_photomotion_meme(
     source_photo_path: Path,
     concept: dict[str, Any],
@@ -3310,7 +3401,24 @@ def render_ltx_video_meme(
         segment_count = args.ltx23_segments
         if segment_count > 1 and args.ltx23_input_mode == "prompt":
             raise RuntimeError("ltx23 multi-segment rendering requires an image input mode")
-        prompts = compose_ltx23_segment_prompts(post, concept, segments=segment_count)
+        audio_mode = getattr(args, "ltx23_audio_mode", "native")
+        narration_path: Path | None = None
+        narration_total: float | None = None
+        if audio_mode == "tts":
+            if segment_count > 1:
+                raise RuntimeError("ltx23 tts audio mode currently supports a single segment")
+            narration_path, narration_total, narration_meta = synthesize_narration_track(
+                concept, output_path.parent, output_path.stem, args
+            )
+            frames = ltx_valid_frame_count(math.ceil(narration_total * args.ltx23_fps))
+            concept["narration"] = narration_meta
+            print(
+                f"  narration: {narration_total:.2f}s measured -> {frames} frames "
+                f"({narration_meta['tts_backend']})"
+            )
+        prompts = compose_ltx23_segment_prompts(
+            post, concept, segments=segment_count, audio_mode=audio_mode
+        )
         reference_path: Path | None = None
         if args.ltx23_input_mode == "image":
             if final_image_path is None:
@@ -3332,7 +3440,12 @@ def render_ltx_video_meme(
         current_reference = reference_path
         for segment_index, segment_prompt_text in enumerate(prompts, 1):
             if segment_count == 1:
-                segment_prefix, segment_output = prefix, output_path
+                segment_prefix = prefix
+                segment_output = (
+                    output_path.with_name(f"{output_path.stem}-rawvideo.mp4")
+                    if narration_path is not None
+                    else output_path
+                )
             else:
                 segment_prefix = f"{prefix}-segment-{segment_index}"
                 segment_output = output_path.with_name(f"{output_path.stem}-segment-{segment_index}.mp4")
@@ -3379,8 +3492,14 @@ def render_ltx_video_meme(
                 current_reference = extract_ltx_continuation_frame(segment_output, continuation_path, 0)
         if segment_count > 1:
             concatenate_video_segments(segment_paths, output_path)
-        concept["video_duration_seconds"] = segment_count * frames / args.ltx23_fps
-        concept["native_audio"] = True
+        if narration_path is not None and narration_total is not None:
+            finish_ltx23_with_tts(segment_paths[0], narration_path, narration_total, output_path)
+            segment_paths[0].unlink(missing_ok=True)
+            narration_path.unlink(missing_ok=True)
+            concept["video_duration_seconds"] = narration_total
+        else:
+            concept["video_duration_seconds"] = segment_count * frames / args.ltx23_fps
+        concept["native_audio"] = audio_mode == "native"
         concept["ltx23_segments"] = segment_records
         return output_path
     if args.ltx_input_mode == "image":
@@ -3984,6 +4103,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ltx23-height", type=int, default=720)
     parser.add_argument("--ltx23-frames", type=int, default=49)
     parser.add_argument("--ltx23-segments", type=int, choices=(1, 2), default=1)
+    parser.add_argument(
+        "--ltx23-audio-mode",
+        choices=("native", "tts"),
+        default="native",
+        help=(
+            "native keeps LTX's own audio (unreliable PT-BR pronunciation); tts renders video-only "
+            "and muxes a measured local-TTS narration, deriving the frame count from the audio."
+        ),
+    )
     parser.add_argument("--ltx23-fps", type=float, default=25.0)
     parser.add_argument("--ltx23-steps", type=int, default=8)
     parser.add_argument("--ltx23-audio-cfg", type=float, default=7.0)
