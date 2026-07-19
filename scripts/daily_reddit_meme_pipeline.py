@@ -2755,7 +2755,33 @@ def make_video_audio(text: str, output_path: Path, duration: float) -> Path:
     return output_path
 
 
-def synthesize_ptbr_speech(text: str, output_path: Path, rate: str) -> Path:
+def normalize_piper_text(value: str) -> str:
+    """Prepare dialogue text for Piper: it phonemizes literally, so ALL-CAPS meme text and
+    written interjections ("HMMM", "...") need lowering/softening or they come out spelled."""
+
+    value = " ".join((value or "").split()).lower()
+    value = re.sub(r"\bh+u?m+\b", "humm", value)
+    value = value.replace("...", ", ")
+    return value[:240] or "meme gerado para revisão."
+
+
+def synthesize_ptbr_speech(text: str, output_path: Path, rate: str, backend: str = "edge") -> Path:
+    if backend == "piper":
+        piper_bin = resolve_piper_binary()
+        piper_voice = resolve_piper_voice()
+        if not piper_bin or not piper_voice:
+            raise RuntimeError(
+                "Piper TTS unavailable. Install piper-tts (e.g. python3 -m venv .venv-tts && "
+                ".venv-tts/bin/pip install piper-tts) and place a pt_BR voice at "
+                "~/.local/share/piper-voices/ or set PIPER_BIN/PIPER_VOICE."
+            )
+        wav_path = output_path.with_suffix(".wav")
+        subprocess.run(
+            [str(piper_bin), "-m", str(piper_voice), "-f", str(wav_path)],
+            input=normalize_piper_text(text).encode("utf-8"),
+            check=True,
+        )
+        return wav_path
     edge_bin = resolve_tts_binary()
     if not edge_bin:
         raise RuntimeError(
@@ -2777,6 +2803,26 @@ def synthesize_ptbr_speech(text: str, output_path: Path, rate: str) -> Path:
         check=True,
     )
     return output_path
+
+
+def audio_duration_seconds(path: Path) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return float(result.stdout.strip())
+
+
+def frames_for_narration(narration_seconds: float, fps: int = 25, lead: float = 0.4, tail: float = 1.2) -> int:
+    """Video length follows the measured narration, not the other way around — this replaces
+    the words-to-duration trial-and-error the coupled LTX audio path required."""
+
+    return ltx_valid_frame_count(math.ceil((lead + narration_seconds + tail) * fps))
 
 
 def concatenate_video_segments(segment_paths: list[Path], output_path: Path) -> Path:
@@ -2843,12 +2889,16 @@ def mix_ptbr_narration(
     duration: float,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
-    setup_audio = output_path.with_name(output_path.stem + "-setup.mp3")
-    escalation_audio = output_path.with_name(output_path.stem + "-escalation.mp3")
-    punchline_audio = output_path.with_name(output_path.stem + "-punchline.mp3")
-    synthesize_ptbr_speech(setup_text, setup_audio, args.tts_rate)
-    synthesize_ptbr_speech(escalation_text, escalation_audio, args.tts_rate)
-    synthesize_ptbr_speech(punchline_text, punchline_audio, args.tts_rate)
+    backend = getattr(args, "tts_backend", "edge")
+    setup_audio = synthesize_ptbr_speech(
+        setup_text, output_path.with_name(output_path.stem + "-setup.mp3"), args.tts_rate, backend
+    )
+    escalation_audio = synthesize_ptbr_speech(
+        escalation_text, output_path.with_name(output_path.stem + "-escalation.mp3"), args.tts_rate, backend
+    )
+    punchline_audio = synthesize_ptbr_speech(
+        punchline_text, output_path.with_name(output_path.stem + "-punchline.mp3"), args.tts_rate, backend
+    )
     setup_delay_ms = int(args.tts_setup_at * 1000)
     escalation_delay_ms = int(args.tts_escalation_at * 1000)
     punchline_delay_ms = int(args.tts_punchline_at * 1000)
@@ -3433,6 +3483,26 @@ def resolve_tts_binary() -> Path | None:
     return Path(system_bin) if system_bin else None
 
 
+def resolve_piper_binary() -> Path | None:
+    configured = os.environ.get("PIPER_BIN", "").strip()
+    candidate = Path(configured) if configured else None
+    if candidate and candidate.is_file() and os.access(candidate, os.X_OK):
+        return candidate
+    repo_venv = Path(__file__).resolve().parents[1] / ".venv-tts" / "bin" / "piper"
+    if repo_venv.is_file() and os.access(repo_venv, os.X_OK):
+        return repo_venv
+    system_bin = shutil.which("piper")
+    return Path(system_bin) if system_bin else None
+
+
+def resolve_piper_voice() -> Path | None:
+    configured = os.environ.get("PIPER_VOICE", "").strip()
+    if configured and Path(configured).is_file():
+        return Path(configured)
+    default = Path.home() / ".local" / "share" / "piper-voices" / "pt_BR-faber-medium.onnx"
+    return default if default.is_file() else None
+
+
 def run_preflight(args: argparse.Namespace) -> dict[str, Any]:
     """Check all dependencies once, before any expensive or mutable stage."""
 
@@ -3736,6 +3806,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ltx23-continuation-strength", type=float, default=0.92)
     parser.add_argument("--ltx23-reference-compression", type=int, default=18)
     parser.add_argument("--tts-rate", default="-12%")
+    parser.add_argument(
+        "--tts-backend",
+        choices=("piper", "edge"),
+        default="piper",
+        help="Narration synthesizer: piper (local, default) or edge (hosted Microsoft voice, legacy).",
+    )
     parser.add_argument("--tts-setup-at", type=float, default=0.5)
     parser.add_argument("--tts-escalation-at", type=float, default=4.2)
     parser.add_argument("--tts-punchline-at", type=float, default=10.0)
