@@ -3431,6 +3431,15 @@ def render_ltx_video_meme(
             if not source_reference.is_file():
                 raise RuntimeError(f"ltx23 source reference image not found: {source_reference}")
             reference_path = source_reference
+            # An extreme-portrait photo squeezed into a landscape render breaks the I2V
+            # anchoring (observed 3x on the same concept: the model abandons the scene
+            # mid-clip). Match the render orientation to the source photo's.
+            with Image.open(source_reference) as _source_probe:
+                source_w, source_h = _source_probe.size
+            if source_h > source_w and args.ltx23_width > args.ltx23_height:
+                args = argparse.Namespace(**vars(args))
+                args.ltx23_width, args.ltx23_height = args.ltx23_height, args.ltx23_width
+                print(f"  orientation matched to portrait source: {args.ltx23_width}x{args.ltx23_height}")
         print(
             f"  LTX 2.3 native A/V validation: {segment_count} segment(s) x {frames} frames "
             f"({'I2V' if reference_path else 'T2V'})"
