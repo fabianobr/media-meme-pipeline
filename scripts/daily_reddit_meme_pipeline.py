@@ -1119,6 +1119,68 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def redact_prompt_images(messages: Any) -> Any:
+    """Deep-copies a chat messages list with any embedded base64 images replaced by a
+    size placeholder, so a stored prompt never carries raw image bytes."""
+
+    if not isinstance(messages, list):
+        return messages
+    redacted = deepcopy(messages)
+    for message in redacted:
+        if isinstance(message, dict) and isinstance(message.get("images"), list):
+            message["images"] = [
+                f"[image omitted, {len(image)} base64 chars]" if isinstance(image, str) else "[image omitted]"
+                for image in message["images"]
+            ]
+    return redacted
+
+
+def timed_generation_request(
+    calls: list[dict[str, Any]],
+    *,
+    backend: str,
+    stage: str,
+    payload: dict[str, Any],
+    timeout: int,
+    url: str,
+    round_number: int | None = None,
+) -> dict[str, Any]:
+    """Ollama request wrapper shared by every stage that calls a local model. Records
+    the exact prompt (images redacted), model, and options into `calls` before the
+    request, and timing/outcome after — regardless of whether validation downstream of
+    the response succeeds."""
+
+    call_record: dict[str, Any] = {
+        "backend": backend,
+        "stage": stage,
+        "model": str(payload.get("model") or ""),
+        "prompt": redact_prompt_images(payload.get("messages")),
+        "options": deepcopy(payload.get("options") or {}),
+        "timeout_seconds": timeout,
+        "started_at": datetime.now().astimezone().isoformat(),
+        "state": "running",
+    }
+    if round_number is not None:
+        call_record["round"] = round_number
+    calls.append(call_record)
+    started = time.monotonic()
+    try:
+        response = request_json("POST", url, json=payload, timeout=timeout)
+    except Exception as exc:  # noqa: BLE001 - failure itself is the useful signal here
+        call_record["state"] = "failed"
+        call_record["error"] = str(exc)
+        raise
+    else:
+        call_record["state"] = "completed"
+        content = str((response.get("message") or {}).get("content") or "")
+        call_record["response_chars"] = len(content)
+        call_record["response_preview"] = content[:500]
+    finally:
+        call_record["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        call_record["finished_at"] = datetime.now().astimezone().isoformat()
+    return response
+
+
 def normalize_publish_candidate(payload: Any) -> dict[str, Any]:
     """Best-effort cleanup before validation: trim strings, prefix hashtags, dedupe."""
 
