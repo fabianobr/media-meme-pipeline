@@ -694,3 +694,27 @@ Fase C (página HTML foto|Tier1|Tier2 para o veredito único que fecha o tier de
       (gato pequeno num tapete vazio); candidato a critério futuro no gate de fonte
       (dominância do sujeito). O fix de orientação permanece (correto por si; retrato
       448×768 renderiza sem problema de memória).
+
+## Lane de notícias (2026-07-18/19)
+
+Nova direção do usuário: "criar memes virais com base nas notícias mais populares". O pivô
+destravou isso — com narrador, a notícia é CONTADA pela voz (o gate de texto-embutido existia
+porque o pipeline antigo não tinha como transmitir a história). Decisões do usuário: figuras
+públicas PODEM ser animadas (guardrail mantido por design: voz sempre do narrador, nunca
+lip-sync atribuindo fala à pessoa; movimento idle sutil); visual = foto da notícia quando
+cena utilizável, senão foto de reação do acervo.
+
+Primeiro ciclo completo do fluxo novo (custo de tokens ~zero até o veredito):
+- Curadoria: 3 aprovados de 87 (gates novos bem mais rígidos).
+- **gemma4:31b como escritor: 3/3 de consenso no funil animal** (vs ~10% histórico) e 6
+  piadas de notícia decentes direto do título (1 descartada por sensibilidade — boato de
+  morte). Usuário aprovou 8/8 textos.
+- Render em lote de 8 na receita validada: 7/8 de primeira. Achados: teto de frames antigo
+  (257) era do envelope de resolução maior — 273/281 frames passam em 768×448; placar de
+  transmissão vira texto borrado na re-geração (ressalva entregue; melhoria futura: crop de
+  UI); 1 falha de contrato ("missing observable action" em script do funil) corrigida com
+  timeline de ação e re-render. Incidente operacional: pkill matou a própria shell (padrão
+  casou com o comando) e deixou job órfão de 720×1280 na fila do ComfyUI (default de
+  dimensões sem override + swap de retrato) — interrompido via API, relançado no envelope.
+  Lição: sempre passar --ltx23-width/height explícitos e nunca pkill com padrão que casa a
+  própria invocação.
