@@ -263,6 +263,17 @@ class CurationPortraitTests(unittest.TestCase):
         ordered = curation.prioritize_portrait(entries)
         self.assertEqual([item["post"]["id"] for item in ordered], ["b", "d", "a", "c", "e"])
 
+    def test_drift_risk_entries_sort_after_safe_entries_regardless_of_portrait(self) -> None:
+        entries = [
+            {"post": {"id": "a"}, "portrait": True, "drift_risk": True},
+            {"post": {"id": "b"}, "portrait": False, "drift_risk": False},
+            {"post": {"id": "c"}, "portrait": True, "drift_risk": False},
+            {"post": {"id": "d"}, "portrait": False, "drift_risk": True},
+            {"post": {"id": "e"}, "portrait": True},  # missing drift_risk key: treated as safe
+        ]
+        ordered = curation.prioritize_portrait(entries)
+        self.assertEqual([item["post"]["id"] for item in ordered], ["c", "e", "b", "a", "d"])
+
 
 class PipelineWiringTests(unittest.TestCase):
     def test_publish_model_flag_defaults_to_none(self) -> None:

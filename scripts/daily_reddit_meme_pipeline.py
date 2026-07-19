@@ -2685,6 +2685,7 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
         "approved": approved,
         "scores": normalized_scores,
         "reason": reason,
+        "resting_domestic_animal_scene": bool(review.get("resting_domestic_animal_scene")),
     }
 
 
@@ -2703,6 +2704,7 @@ def assess_source_suitability(
             "embedded_text_carries_meaning": {"type": "boolean"},
             "multi_photo_collage": {"type": "boolean"},
             "open_scene_no_intrinsic_motion": {"type": "boolean"},
+            "resting_domestic_animal_scene": {"type": "boolean"},
             "scores": {
                 "type": "object",
                 "properties": {
@@ -2717,7 +2719,7 @@ def assess_source_suitability(
         },
         "required": [
             "approved", "embedded_text_carries_meaning", "multi_photo_collage",
-            "open_scene_no_intrinsic_motion", "scores", "reason",
+            "open_scene_no_intrinsic_motion", "resting_domestic_animal_scene", "scores", "reason",
         ],
     }
     try:
@@ -2750,6 +2752,10 @@ Responda tambem tres campos booleanos obrigatorios, de forma literal:
 - open_scene_no_intrinsic_motion: true se a cena é aberta com o sujeito principal pequeno ou
   distante da câmera, e nada na imagem é intrinsecamente móvel (fogo, água, fumaça, multidão,
   rosto em close) — nesse caso um modelo I2V não anima nada de verdade e o vídeo fica estático.
+- resting_domestic_animal_scene: true se o sujeito principal é um animal doméstico (cão,
+  gato) parado, deitado ou dormindo em um ambiente interno/doméstico — esse tipo de cena é
+  um atrator conhecido de distorção no render I2V (a cena inteira muda de forma
+  imprevisível), mesmo quando o resto da imagem é clara e adequada.
 Responda somente JSON.
 Formato exato: {{"approved": false, "scores": {{"source_match": 0, "visual_clarity": 0,
 "motion_potential": 0, "text_independence": 0}}, "reason": "..."}}

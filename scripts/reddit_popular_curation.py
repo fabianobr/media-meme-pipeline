@@ -82,10 +82,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def prioritize_portrait(approved: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Portrait sources first (they fill the 9:16 canvas without blur-pad), preserving
-    curation order within each group. Soft priority only — landscape stays eligible."""
+    """Portrait sources first (they fill the 9:16 canvas without blur-pad) among sources
+    that are not a known LTX drift-attractor risk, preserving curation order within each
+    group. Both priorities are soft only — landscape and drift-risk sources stay eligible,
+    never dropped."""
 
-    return sorted(approved, key=lambda item: 0 if item.get("portrait") else 1)
+    return sorted(
+        approved,
+        key=lambda item: (1 if item.get("drift_risk") else 0, 0 if item.get("portrait") else 1),
+    )
 
 
 def main() -> int:
@@ -180,6 +185,7 @@ def main() -> int:
                     "media_path": media_path,
                     "media_resolution": [width, height],
                     "portrait": height > width,
+                    "drift_risk": bool(review.get("resting_domestic_animal_scene")),
                     "visual_description": description,
                     "review": review,
                     "curated_at": datetime.now(timezone.utc).isoformat(),

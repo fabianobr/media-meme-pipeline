@@ -484,6 +484,34 @@ class SourceSuitabilityMotionCapTests(unittest.TestCase):
         self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["required"])
 
 
+class SourceSuitabilityDriftRiskPassthroughTests(unittest.TestCase):
+    def test_resting_domestic_animal_flag_passes_through_without_affecting_approval(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+            "resting_domestic_animal_scene": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cachorro deitado no carro",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertTrue(result["approved"])
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+        self.assertTrue(result["resting_domestic_animal_scene"])
+
+    def test_flag_defaults_to_false_when_missing(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "ok",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertFalse(result["resting_domestic_animal_scene"])
+
+
 class PopularCurationBacklogTests(unittest.TestCase):
     def _post(self, post_id: str, media_type: str, rank: int) -> reddit.RedditPost:
         return reddit.RedditPost(
