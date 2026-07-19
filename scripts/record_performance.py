@@ -70,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main_with_args(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
 
-    # Determine log file path: use arg, environment, or default
+    # Determine log file path: use --log-file if given, else the repo-relative default
     if args.log_file is None:
         # Default to data/media-pipeline/performance-log.json relative to repo root
         repo_root = Path(__file__).resolve().parents[1]

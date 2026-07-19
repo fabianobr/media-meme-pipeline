@@ -150,6 +150,27 @@ class RecordPerformanceTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertFalse(log_path.is_file())
 
+    def test_malformed_metric_leaves_existing_log_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "performance-log.json"
+            perf.main_with_args([
+                "--publish-id", "p1",
+                "--platform", "youtube_shorts",
+                "--metric", "views=100",
+                "--log-file", str(log_path),
+            ])
+            before = log_path.read_text(encoding="utf-8")
+
+            exit_code = perf.main_with_args([
+                "--publish-id", "p1",
+                "--platform", "youtube_shorts",
+                "--metric", "broken",
+                "--log-file", str(log_path),
+            ])
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(log_path.read_text(encoding="utf-8"), before)
+
     def test_captured_at_is_iso8601_timezone_aware(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "performance-log.json"
@@ -174,15 +195,29 @@ class RecordPerformanceTests(unittest.TestCase):
             self.assertLessEqual(captured, after)
 
     def test_default_log_file_path(self) -> None:
-        """Test that without --log-file, the script uses the default path."""
-        with tempfile.TemporaryDirectory() as tmp:
-            # We'll use a temporary directory and check the script's behavior
-            # The actual default is data/media-pipeline/performance-log.json
-            # relative to the repo root, so we just verify it doesn't crash
-            # when called without --log-file (it would write to the real location)
-            # For this test, we skip it and rely on the other tests that
-            # explicitly pass --log-file.
-            pass
+        """Test that without --log-file, main_with_args resolves the default to
+        data/media-pipeline/performance-log.json relative to the repo root.
+
+        build_parser() itself leaves --log-file as None (the resolution happens
+        in main_with_args), so this exercises main_with_args end-to-end against a
+        faked module location to avoid touching the real repo's data directory.
+        """
+        original_file = perf.__file__
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                fake_scripts_dir = Path(tmp) / "scripts"
+                fake_scripts_dir.mkdir()
+                perf.__file__ = str(fake_scripts_dir / "record_performance.py")
+
+                exit_code = perf.main_with_args([
+                    "--publish-id", "x", "--platform", "y", "--metric", "views=1",
+                ])
+
+                self.assertEqual(exit_code, 0)
+                expected = Path(tmp) / "data" / "media-pipeline" / "performance-log.json"
+                self.assertTrue(expected.is_file())
+        finally:
+            perf.__file__ = original_file
 
     def test_stdout_confirmation_message(self) -> None:
         """Test that the script prints a confirmation message."""
