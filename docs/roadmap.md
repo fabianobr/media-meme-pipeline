@@ -682,3 +682,15 @@ Fase C (página HTML foto|Tier1|Tier2 para o veredito único que fecha o tier de
       source` + `--ltx23-audio-mode tts` + `--tts-backend piper` são agora o caminho padrão.
       Fix de orientação (fonte retrato → render retrato) commitado; retry do gato-no-sol em
       andamento.
+- [x] **Escritor de piadas movido para modelo local free** (pedido do usuário: "texto da
+      piada deveria ser um modelo eficiente porém free"). Bench com few-shot dos 6 exemplares
+      aprovados em 3 posts curados: **gemma4:31b venceu com 3/3 no estilo narrador** ("tá
+      conferindo se ele não roubou o café!"), gemma3:12b mediano, qwen3:14b continua ruim.
+      Default `--humor-model` atualizado qwen3:8b→gemma4:31b. Fluxo: modelo local escreve →
+      Claude revisa (barato) → veredito de texto do usuário → render.
+- [x] **Gato-no-sol descartado em definitivo** após 4ª ocorrência do MESMO drift (homem de
+      moletom com celular), inclusive em render retrato — orientação não era a causa. Lição
+      nova: **sujeito ocupando fração mínima de um quadro vazio é âncora fraca para I2V**
+      (gato pequeno num tapete vazio); candidato a critério futuro no gate de fonte
+      (dominância do sujeito). O fix de orientação permanece (correto por si; retrato
+      448×768 renderiza sem problema de memória).

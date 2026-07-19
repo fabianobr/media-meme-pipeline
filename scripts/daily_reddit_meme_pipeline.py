@@ -4026,7 +4026,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ollama-model", default=DEFAULT_OLLAMA_MODEL)
     parser.add_argument("--vision-model", default=DEFAULT_VISION_MODEL)
     parser.add_argument("--source-critic-model", default="gemma3:12b")
-    parser.add_argument("--humor-model", default="qwen3:8b")
+    parser.add_argument("--humor-model", default="gemma4:31b")
     parser.add_argument(
         "--humor-critic-model",
         default="llama3:latest",
