@@ -666,6 +666,29 @@ class VideoScriptSpeciesPreservationTests(unittest.TestCase):
         self.assertNotIn("cat", script["character"].lower())
         self.assertIn("bezerro", script["character"].lower())
 
+    def test_plural_human_subject_is_detected_not_treated_as_animal(self) -> None:
+        post = self._post("A traditional technique used by young shepherds of Ethiopia's Banna tribe")
+        concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": "boss_fight"}
+        script = pipeline.build_video_script(
+            post, concept,
+            visual_description=(
+                "Dois homens estao em uma paisagem montanhosa com um ceu claro. "
+                "Eles seguram longos bastoes de madeira."
+            ),
+        )
+        self.assertIn("human subject", script["character"].lower())
+        self.assertNotIn("stays mostly still", script["character"].lower())
+        self.assertNotIn("species", script["character"].lower())
+
+    def test_boss_fight_and_default_archetype_timelines_never_hardcode_cat(self) -> None:
+        post = self._post("A traditional technique used by young shepherds of Ethiopia's Banna tribe")
+        visual_description = "Dois homens estao em uma paisagem montanhosa segurando bastoes de madeira."
+        for archetype in ("boss_fight", "pov_spiral"):
+            concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": archetype}
+            script = pipeline.build_video_script(post, concept, visual_description=visual_description)
+            timeline_text = " ".join(script["timeline"]).lower()
+            self.assertNotIn("the cat", timeline_text, f"archetype={archetype}")
+
     def test_cat_scene_preserves_specific_markings_instead_of_generic_orange(self) -> None:
         post = self._post("A cat with fur and eyes that are split into two distinct colors")
         concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": "pov_spiral"}

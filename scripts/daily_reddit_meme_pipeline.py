@@ -894,7 +894,11 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
                 "colors, and markings precisely, stays in place, blinks once, and makes a tiny ear twitch."
             )
             prop = "The subject already described in the scene is the main subject, preserved clearly and not replaced."
-        elif re.search(r"\b(homem|mulher|pessoa|adulto|jovem|criança|person|man|woman)\b", visual_summary, re.I):
+        elif re.search(
+            r"\b(homem|homens|mulher|mulheres|pessoa|pessoas|adulto|adultos|jovem|jovens|"
+            r"criança|crianças|person|people|man|men|woman|women)\b",
+            visual_summary, re.I,
+        ):
             character = (
                 "The visible human subject, kept generic and fictional, with the same approximate pose, stable face, "
                 "and small readable reaction."
@@ -917,9 +921,9 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             beat = "deadpan reaction inside the exact source-image situation"
         elif archetype == "boss_fight":
             action = [
-                "0-3s: the cat notices the scene and holds a serious stare.",
-                "3-7s: camera slowly pushes in while the cat makes one tiny cautious movement.",
-                "7-10s: the cat pauses, then gives a defeated look to camera.",
+                "0-3s: the subject notices the scene and holds a serious stare.",
+                "3-7s: camera slowly pushes in while the subject makes one tiny cautious movement.",
+                "7-10s: the subject pauses, then gives a defeated look to camera.",
             ]
             beat = "ordinary source-image subject staged like a final boss"
         elif archetype == "expectation_reality":
@@ -938,9 +942,9 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             beat = "source-image situation becomes a tiny side quest"
         else:
             action = [
-                "0-3s: the cat holds a fixed stare toward the camera.",
-                "3-7s: the cat blinks once and makes a tiny shift while staying seated.",
-                "7-10s: the cat pauses, then gives a tiny defeated nod.",
+                "0-3s: the subject holds a fixed stare toward the camera.",
+                "3-7s: the subject blinks once and makes a tiny shift while staying in place.",
+                "7-10s: the subject pauses, then gives a tiny defeated nod.",
             ]
             beat = "the source-image situation becomes absurd without changing location"
 
