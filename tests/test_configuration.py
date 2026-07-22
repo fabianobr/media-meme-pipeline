@@ -22,14 +22,18 @@ class ServiceUrlTests(unittest.TestCase):
         self.assertFalse(pipeline.build_parser().parse_args([]).telegram)
         self.assertTrue(pipeline.build_parser().parse_args(["--telegram"]).telegram)
 
-    def test_ltx23_defaults_to_real_photo_with_tts_narration(self) -> None:
-        # User-validated recipe (2026-07-18): animate the real source photo, replace the
-        # unreliable native audio with a measured local-TTS narration.
+    def test_ltx23_defaults_to_t2v_prompt_with_tts_narration(self) -> None:
+        # User-validated recipe (2026-07-21): T2V from a detailed literal scene description
+        # (no reference image), replacing the unreliable native audio with a measured
+        # local-TTS narration. Supersedes the 2026-07-18 I2V-from-source-photo default —
+        # T2V with a detailed prompt reads as clearly better ("nitidamente melhor") than I2V
+        # for the same source photo. See docs/roadmap.md item 20.
         args = pipeline.build_parser().parse_args([])
         self.assertEqual(args.video_engine, "ltx23")
-        self.assertEqual(args.ltx23_input_mode, "source")
+        self.assertEqual(args.ltx23_input_mode, "prompt")
         self.assertEqual(args.ltx23_audio_mode, "tts")
         self.assertEqual(args.tts_backend, "piper")
+        self.assertEqual(args.ltx23_audio_cfg, 3.0)
 
     def test_environment_overrides_localhost(self) -> None:
         args = argparse.Namespace(ollama_url=None, comfyui_url=None, n8n_url=None)
@@ -187,9 +191,9 @@ class HumorGateTests(unittest.TestCase):
         self.assertFalse(result["humor_approved"])
         self.assertTrue(result["humor_review"]["error"])
         self.assertEqual(request.call_count, 1)
-        self.assertEqual(result["execution"]["llm_calls"][0]["stage"], "writer")
-        self.assertEqual(result["execution"]["llm_calls"][0]["state"], "failed")
-        self.assertIn("critic offline", result["execution"]["llm_calls"][0]["error"])
+        self.assertEqual(result["execution"]["generation_calls"][0]["stage"], "writer")
+        self.assertEqual(result["execution"]["generation_calls"][0]["state"], "failed")
+        self.assertIn("critic offline", result["execution"]["generation_calls"][0]["error"])
 
     def test_generation_stops_after_three_rounds(self) -> None:
         candidates = [
@@ -211,8 +215,8 @@ class HumorGateTests(unittest.TestCase):
         self.assertFalse(result["humor_approved"])
         self.assertEqual(len(result["humor_rounds"]), 3)
         self.assertEqual(request.call_count, 6)
-        self.assertEqual(len(result["execution"]["llm_calls"]), 6)
-        self.assertTrue(all(call["state"] == "completed" for call in result["execution"]["llm_calls"]))
+        self.assertEqual(len(result["execution"]["generation_calls"]), 6)
+        self.assertTrue(all(call["state"] == "completed" for call in result["execution"]["generation_calls"]))
         self.assertTrue(all(call.kwargs["json"]["think"] is False for call in request.call_args_list))
         self.assertEqual(
             [call.kwargs["json"]["model"] for call in request.call_args_list],
@@ -401,6 +405,117 @@ class SourceSuitabilityTests(unittest.TestCase):
         self.assertEqual(review["scores"]["visual_clarity"], 3.0)
 
 
+class SourceSuitabilityMotionCapTests(unittest.TestCase):
+    def test_open_scene_flag_caps_motion_potential_to_two(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 3, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 2.0)
+        self.assertFalse(result["approved"])  # 2.0 < required minimum of 3
+        self.assertIn("cena aberta", result["reason"])
+
+    def test_open_scene_flag_false_does_not_cap(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+        self.assertTrue(result["approved"])
+
+    def test_open_scene_flag_missing_defaults_to_no_cap(self) -> None:
+        # Backward compatibility: old persisted reviews (before this field existed) must
+        # not retroactively get capped just because the key is absent.
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+
+    def test_open_scene_cap_combines_with_existing_caps(self) -> None:
+        # A source can trip more than one deterministic rule at once; both caps must apply.
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": True,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 3, "text_independence": 4},
+            "reason": "cena clara",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertEqual(result["scores"]["motion_potential"], 2.0)
+        self.assertEqual(result["scores"]["text_independence"], 2.0)
+
+    def test_assess_source_suitability_schema_requires_open_scene_flag(self) -> None:
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_motion", title="A person in a wide patio", author="/u/demo",
+            url="https://example.com", updated="2026-07-19T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        review_payload = {
+            "approved": True, "reason": "ok",
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 2, "text_independence": 5},
+            "embedded_text_carries_meaning": False, "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "photo.jpg"
+            pipeline.Image.new("RGB", (32, 32), color="green").save(image_path)
+            with patch.object(
+                pipeline, "request_json",
+                return_value={"message": {"content": pipeline.json.dumps(review_payload)}},
+            ) as mock_request:
+                pipeline.assess_source_suitability(post, image_path, "a woman in a patio", "critic-model", 30)
+        self.assertEqual(mock_request.call_count, 1)
+        _, kwargs = mock_request.call_args
+        payload = kwargs["json"]
+        self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["properties"])
+        self.assertEqual(payload["format"]["properties"]["open_scene_no_intrinsic_motion"]["type"], "boolean")
+        self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["required"])
+
+
+class SourceSuitabilityDriftRiskPassthroughTests(unittest.TestCase):
+    def test_resting_domestic_animal_flag_passes_through_without_affecting_approval(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "open_scene_no_intrinsic_motion": False,
+            "resting_domestic_animal_scene": True,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "cachorro deitado no carro",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertTrue(result["approved"])
+        self.assertEqual(result["scores"]["motion_potential"], 4.0)
+        self.assertTrue(result["resting_domestic_animal_scene"])
+
+    def test_flag_defaults_to_false_when_missing(self) -> None:
+        review = {
+            "approved": True,
+            "embedded_text_carries_meaning": False,
+            "multi_photo_collage": False,
+            "scores": {"source_match": 5, "visual_clarity": 5, "motion_potential": 4, "text_independence": 5},
+            "reason": "ok",
+        }
+        result = pipeline.finalize_source_suitability_review(review)
+        self.assertFalse(result["resting_domestic_animal_scene"])
+
+
 class PopularCurationBacklogTests(unittest.TestCase):
     def _post(self, post_id: str, media_type: str, rank: int) -> reddit.RedditPost:
         return reddit.RedditPost(
@@ -554,6 +669,29 @@ class VideoScriptSpeciesPreservationTests(unittest.TestCase):
         )
         self.assertNotIn("cat", script["character"].lower())
         self.assertIn("bezerro", script["character"].lower())
+
+    def test_plural_human_subject_is_detected_not_treated_as_animal(self) -> None:
+        post = self._post("A traditional technique used by young shepherds of Ethiopia's Banna tribe")
+        concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": "boss_fight"}
+        script = pipeline.build_video_script(
+            post, concept,
+            visual_description=(
+                "Dois homens estao em uma paisagem montanhosa com um ceu claro. "
+                "Eles seguram longos bastoes de madeira."
+            ),
+        )
+        self.assertIn("human subject", script["character"].lower())
+        self.assertNotIn("stays mostly still", script["character"].lower())
+        self.assertNotIn("species", script["character"].lower())
+
+    def test_boss_fight_and_default_archetype_timelines_never_hardcode_cat(self) -> None:
+        post = self._post("A traditional technique used by young shepherds of Ethiopia's Banna tribe")
+        visual_description = "Dois homens estao em uma paisagem montanhosa segurando bastoes de madeira."
+        for archetype in ("boss_fight", "pov_spiral"):
+            concept = {"top_text": "A", "middle_text": "B", "bottom_text": "C", "meme_archetype": archetype}
+            script = pipeline.build_video_script(post, concept, visual_description=visual_description)
+            timeline_text = " ".join(script["timeline"]).lower()
+            self.assertNotIn("the cat", timeline_text, f"archetype={archetype}")
 
     def test_cat_scene_preserves_specific_markings_instead_of_generic_orange(self) -> None:
         post = self._post("A cat with fur and eyes that are split into two distinct colors")

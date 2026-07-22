@@ -55,6 +55,11 @@ DEFAULT_LTX23_LORA = "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_
 DEFAULT_LTX23_UPSCALER = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 LTX23_API_WORKFLOW = PROJECT_ROOT / "workflows" / "03-ltx23-native-t2v-audio-api.json"
 LTX23_I2V_API_WORKFLOW = PROJECT_ROOT / "workflows" / "05-ltx23-official-i2v-audio-api.json"
+# T2V native workflow's joint audio/video latent produces NaN in the AAC encode past this
+# length regardless of audio CFG (confirmed by bisection: 353 frames/14.12s renders clean,
+# 369/14.76s and 377/15.08s both fail) -- see docs/roadmap.md item 20. Audio is discarded and
+# replaced by TTS in the default audio_mode anyway, so capping here is safe.
+LTX23_T2V_TTS_MAX_FRAMES = 353
 N8N_URL = "http://localhost:5678"
 N8N_GENERATE_URL = f"{N8N_URL}/webhook/comfyui-media-generate"
 N8N_STATUS_URL = f"{N8N_URL}/webhook/comfyui-media-status"
@@ -63,7 +68,11 @@ COMFYUI_VIEW_URL = f"{COMFYUI_URL}/view"
 OLLAMA_URL = "http://localhost:11434"
 VIDEO_FPS = 30
 MIN_LTX_VIDEO_SECONDS = 10.0
-CONCEPT_SCHEMA_VERSION = 2
+CONCEPT_SCHEMA_VERSION = 3
+SUPPORTED_CONCEPT_SCHEMA_VERSIONS = frozenset({2, 3})
+PUBLISH_TITLE_MAX_CHARS = 100
+PUBLISH_TOPICS_RANGE = (3, 5)
+PUBLISH_HASHTAGS_RANGE = (4, 8)
 MAX_HUMOR_ROUNDS = 3
 MAX_CONCEPTS_PER_POST = 5
 VALID_STAGE_STATES = {"pending", "running", "approved", "rejected", "failed"}
@@ -890,7 +899,11 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
                 "colors, and markings precisely, stays in place, blinks once, and makes a tiny ear twitch."
             )
             prop = "The subject already described in the scene is the main subject, preserved clearly and not replaced."
-        elif re.search(r"\b(homem|mulher|pessoa|adulto|jovem|criança|person|man|woman)\b", visual_summary, re.I):
+        elif re.search(
+            r"\b(homem|homens|mulher|mulheres|pessoa|pessoas|adulto|adultos|jovem|jovens|"
+            r"criança|crianças|person|people|man|men|woman|women)\b",
+            visual_summary, re.I,
+        ):
             character = (
                 "The visible human subject, kept generic and fictional, with the same approximate pose, stable face, "
                 "and small readable reaction."
@@ -913,9 +926,9 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             beat = "deadpan reaction inside the exact source-image situation"
         elif archetype == "boss_fight":
             action = [
-                "0-3s: the cat notices the scene and holds a serious stare.",
-                "3-7s: camera slowly pushes in while the cat makes one tiny cautious movement.",
-                "7-10s: the cat pauses, then gives a defeated look to camera.",
+                "0-3s: the subject notices the scene and holds a serious stare.",
+                "3-7s: the subject makes one tiny cautious movement, staying in frame.",
+                "7-10s: the subject pauses, then gives a defeated look to camera.",
             ]
             beat = "ordinary source-image subject staged like a final boss"
         elif archetype == "expectation_reality":
@@ -934,9 +947,9 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             beat = "source-image situation becomes a tiny side quest"
         else:
             action = [
-                "0-3s: the cat holds a fixed stare toward the camera.",
-                "3-7s: the cat blinks once and makes a tiny shift while staying seated.",
-                "7-10s: the cat pauses, then gives a tiny defeated nod.",
+                "0-3s: the subject holds a fixed stare toward the camera.",
+                "3-7s: the subject blinks once and makes a tiny shift while staying in place.",
+                "7-10s: the subject pauses, then gives a tiny defeated nod.",
             ]
             beat = "the source-image situation becomes absurd without changing location"
 
@@ -946,7 +959,7 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             "character": character,
             "main_prop": prop,
             "source_visual_description": visual_description,
-            "camera": "Single continuous shot, preserve source framing, very slow push-in, no cuts, no scene transition.",
+            "camera": "Single continuous shot, static camera, preserve source framing, no push-in, no cuts, no scene transition.",
             "timeline": action,
             "comedy_beat": beat,
             "dialogue": dialogue,
@@ -1115,6 +1128,266 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def redact_prompt_images(messages: Any) -> Any:
+    """Deep-copies a chat messages list with any embedded base64 images replaced by a
+    size placeholder, so a stored prompt never carries raw image bytes."""
+
+    if not isinstance(messages, list):
+        return messages
+    redacted = deepcopy(messages)
+    for message in redacted:
+        if isinstance(message, dict) and isinstance(message.get("images"), list):
+            message["images"] = [
+                f"[image omitted, {len(image)} base64 chars]" if isinstance(image, str) else "[image omitted]"
+                for image in message["images"]
+            ]
+    return redacted
+
+
+def timed_generation_request(
+    calls: list[dict[str, Any]],
+    *,
+    backend: str,
+    stage: str,
+    payload: dict[str, Any],
+    timeout: int,
+    url: str,
+    round_number: int | None = None,
+) -> dict[str, Any]:
+    """Ollama request wrapper shared by every stage that calls a local model. Records
+    the exact prompt (images redacted), model, and options into `calls` before the
+    request, and timing/outcome after — regardless of whether validation downstream of
+    the response succeeds."""
+
+    call_record: dict[str, Any] = {
+        "backend": backend,
+        "stage": stage,
+        "model": str(payload.get("model") or ""),
+        "prompt": redact_prompt_images(payload.get("messages")),
+        "options": deepcopy(payload.get("options") or {}),
+        "timeout_seconds": timeout,
+        "started_at": datetime.now().astimezone().isoformat(),
+        "state": "running",
+    }
+    if round_number is not None:
+        call_record["round"] = round_number
+    calls.append(call_record)
+    print(
+        f"{stage} round {round_number} started ({call_record['model']}, timeout={timeout}s)"
+        if round_number is not None
+        else f"{stage} started ({call_record['model']}, timeout={timeout}s)"
+    )
+    started = time.monotonic()
+    try:
+        response = request_json("POST", url, json=payload, timeout=timeout)
+    except Exception as exc:  # noqa: BLE001 - failure itself is the useful signal here
+        call_record["state"] = "failed"
+        call_record["error"] = str(exc)
+        raise
+    else:
+        call_record["state"] = "completed"
+        content = str((response.get("message") or {}).get("content") or "")
+        call_record["response_chars"] = len(content)
+        call_record["response_preview"] = content[:500]
+    finally:
+        call_record["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        call_record["finished_at"] = datetime.now().astimezone().isoformat()
+        print(
+            f"{stage} round {round_number} {call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
+            if round_number is not None
+            else f"{stage} {call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
+        )
+    return response
+
+
+def normalize_publish_candidate(payload: Any) -> dict[str, Any]:
+    """Best-effort cleanup before validation: trim strings, prefix hashtags, dedupe."""
+
+    if not isinstance(payload, dict):
+        return {}
+    candidate = dict(payload)
+    for field in ("title", "description"):
+        if isinstance(candidate.get(field), str):
+            candidate[field] = candidate[field].strip()
+    topics = candidate.get("interest_topics")
+    if isinstance(topics, list):
+        candidate["interest_topics"] = [str(item).strip() for item in topics if str(item).strip()]
+    hashtags = candidate.get("hashtags")
+    if isinstance(hashtags, list):
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in hashtags:
+            tag = str(item).strip().replace(" ", "")
+            if not tag:
+                continue
+            if not tag.startswith("#"):
+                tag = f"#{tag}"
+            if tag.lower() in seen:
+                continue
+            seen.add(tag.lower())
+            cleaned.append(tag)
+        candidate["hashtags"] = cleaned
+    return candidate
+
+
+def publish_metadata_issues(payload: Any) -> list[str]:
+    """Deterministic gate for model-produced publish metadata. Empty list means valid."""
+
+    if not isinstance(payload, dict):
+        return ["payload must be a JSON object"]
+    issues: list[str] = []
+    title = payload.get("title")
+    if not isinstance(title, str) or not title.strip():
+        issues.append("title is required")
+    elif len(title) > PUBLISH_TITLE_MAX_CHARS:
+        issues.append(f"title exceeds {PUBLISH_TITLE_MAX_CHARS} chars")
+    description = payload.get("description")
+    if not isinstance(description, str) or not description.strip():
+        issues.append("description is required")
+    topics = payload.get("interest_topics")
+    lo, hi = PUBLISH_TOPICS_RANGE
+    if not isinstance(topics, list) or not all(isinstance(item, str) and item.strip() for item in topics):
+        issues.append("interest_topics must be a list of non-empty strings")
+    elif not lo <= len(topics) <= hi:
+        issues.append(f"interest_topics must have {lo}-{hi} items")
+    hashtags = payload.get("hashtags")
+    lo, hi = PUBLISH_HASHTAGS_RANGE
+    if not isinstance(hashtags, list) or not all(
+        isinstance(item, str) and item.startswith("#") and len(item) > 1 for item in hashtags
+    ):
+        issues.append("hashtags must be a list of #-prefixed strings")
+    elif not lo <= len(hashtags) <= hi:
+        issues.append(f"hashtags must have {lo}-{hi} items")
+    return issues
+
+
+def compose_publish_prompt(post: reddit.RedditPost, concept: dict[str, Any]) -> str:
+    return f"""
+Voce cria metadados de publicacao para videos curtos de humor (YouTube Shorts, Instagram Reels, TikTok), em portugues do Brasil.
+
+O video e uma piada narrada em 3 frases sobre uma foto real:
+- Setup: {concept.get('top_text', '')}
+- Escalada: {concept.get('middle_text', '')}
+- Punchline: {concept.get('bottom_text', '')}
+Titulo do post original: {post.title}
+Contexto da foto: {concept.get('source_brief', '')}
+Descricao visual: {concept.get('source_visual_description', '')}
+
+Responda APENAS um objeto JSON neste formato:
+{{
+  "title": "gancho curto e curioso, maximo {PUBLISH_TITLE_MAX_CHARS} caracteres, sem clickbait enganoso",
+  "description": "1 a 3 frases que despertam curiosidade sem entregar a punchline",
+  "interest_topics": ["{PUBLISH_TOPICS_RANGE[0]} a {PUBLISH_TOPICS_RANGE[1]} assuntos em linguagem natural, ex: gatos, humor absurdo"],
+  "hashtags": ["{PUBLISH_HASHTAGS_RANGE[0]} a {PUBLISH_HASHTAGS_RANGE[1]} hashtags misturando populares e especificas do tema"]
+}}
+
+Regras:
+- Nao mencione IA, Reddit nem o processo de producao.
+- Hashtags sem espacos.
+""".strip()
+
+
+def generate_publish_metadata(
+    post: reddit.RedditPost,
+    concept: dict[str, Any],
+    publish_id: str,
+    model: str,
+    timeout: int,
+    max_attempts: int = 3,
+) -> dict[str, Any]:
+    """Publish metadata via local Ollama. Off-schema output is rejected and retried; the
+    final failure is recorded as status=failed — values are never fabricated."""
+
+    prompt = compose_publish_prompt(post, concept)
+    generation_calls = concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
+        "generation_calls", []
+    )
+    last_issues: list[str] = []
+    for attempt in range(1, max_attempts + 1):
+        payload = {
+            "model": model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": "Voce escreve metadados de publicacao em pt-BR e responde apenas JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            "options": {"temperature": 0.4, "num_predict": 700},
+        }
+        try:
+            data = timed_generation_request(
+                generation_calls, backend="ollama", stage="publish_metadata", round_number=attempt,
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
+            content = (data.get("message") or {}).get("content") or ""
+            candidate = normalize_publish_candidate(extract_json_object(content))
+            issues = publish_metadata_issues(candidate)
+        except Exception as exc:  # noqa: BLE001 - each failed round-trip is one attempt
+            issues = [str(exc)]
+            candidate = {}
+        if not issues:
+            hashtags = list(candidate["hashtags"])
+            return {
+                "publish_id": publish_id,
+                "language": "pt-BR",
+                "title": candidate["title"],
+                "description": candidate["description"],
+                "description_with_hashtags": f"{candidate['description']}\n\n{' '.join(hashtags)}",
+                "interest_topics": list(candidate["interest_topics"]),
+                "hashtags": hashtags,
+                "model": model,
+                "status": "approved",
+                "attempts": attempt,
+            }
+        last_issues = issues
+    return {
+        "publish_id": publish_id,
+        "language": "pt-BR",
+        "model": model,
+        "status": "failed",
+        "issues": last_issues,
+        "attempts": max_attempts,
+    }
+
+
+def render_publish_text(publish: dict[str, Any]) -> str:
+    """Paste-ready text block for manual publishing on the three platforms."""
+
+    return "\n".join(
+        [
+            f"TITULO: {publish.get('title', '')}",
+            "",
+            "DESCRICAO:",
+            str(publish.get("description", "")),
+            "",
+            "DESCRICAO COM HASHTAGS (TikTok/Reels):",
+            str(publish.get("description_with_hashtags", "")),
+            "",
+            f"ASSUNTOS: {', '.join(publish.get('interest_topics') or [])}",
+            f"HASHTAGS: {' '.join(publish.get('hashtags') or [])}",
+            "",
+            f"ID: {publish.get('publish_id', '')}",
+        ]
+    )
+
+
+def prepare_publish_package(run_dir: Path, index: int, slug: str, concept: dict[str, Any]) -> Path | None:
+    """Write publish.json + publish.txt into the per-video package directory. Returns the
+    directory, or None when the concept has no approved publish metadata."""
+
+    publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+    if publish.get("status") != "approved":
+        return None
+    package_dir = run_dir / f"{index:02d}-{slug}"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    publish_json_path = package_dir / "publish.json"
+    write_json(publish_json_path, publish)
+    publish_text_path = package_dir / "publish.txt"
+    publish_text_path.write_text(render_publish_text(publish), encoding="utf-8")
+    concept["publish_json_path"] = str(publish_json_path)
+    concept["publish_text_path"] = str(publish_text_path)
+    return package_dir
+
+
 def humor_candidate_issues(candidate: dict[str, Any], source_text: str = "") -> list[str]:
     setup = str(candidate.get("setup") or "").strip()
     escalation = str(candidate.get("escalation") or "").strip()
@@ -1203,43 +1476,10 @@ def improve_humor_concept(
     critic_model = critic_model or model
     round_limit = 1 if seed_candidates is not None else MAX_HUMOR_ROUNDS
     execution = concept.setdefault("execution", {"state": "pending", "attempts": {}})
-    llm_calls = execution.setdefault("llm_calls", [])
+    generation_calls = execution.setdefault("generation_calls", [])
     encoded_critic_image = encode_image_for_vision(image_path) if image_path is not None else None
     if seed_candidates is not None:
         execution["humor_source"] = "frozen_seeds"
-
-    def timed_humor_request(call_kind: str, round_number: int, payload: dict[str, Any]) -> dict[str, Any]:
-        call_model = str(payload.get("model") or model)
-        call_record: dict[str, Any] = {
-            "stage": call_kind,
-            "round": round_number,
-            "model": call_model,
-            "timeout_seconds": timeout,
-            "started_at": datetime.now().astimezone().isoformat(),
-            "state": "running",
-        }
-        llm_calls.append(call_record)
-        started = time.monotonic()
-        print(f"Humor {call_kind} round {round_number}/{round_limit} started ({call_model}, timeout={timeout}s)")
-        try:
-            response = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
-        except Exception as exc:  # noqa: BLE001
-            call_record["state"] = "failed"
-            call_record["error"] = str(exc)
-            raise
-        else:
-            call_record["state"] = "completed"
-            content = str((response.get("message") or {}).get("content") or "")
-            call_record["response_chars"] = len(content)
-            call_record["response_preview"] = content[:500]
-        finally:
-            call_record["elapsed_seconds"] = round(time.monotonic() - started, 3)
-            call_record["finished_at"] = datetime.now().astimezone().isoformat()
-            print(
-                f"Humor {call_kind} round {round_number}/{round_limit} "
-                f"{call_record['state']} in {call_record['elapsed_seconds']:.3f}s"
-            )
-        return response
 
     safety_context = f"{post.title} {post.summary}".lower()
     sensitive_terms = (
@@ -1376,20 +1616,24 @@ Fonte:
             if seed_candidates is not None:
                 candidates = deepcopy(seed_candidates)
             else:
-                writer_data = timed_humor_request(
-                    "writer",
-                    round_number,
-                    {
-                    "model": model,
-                    "stream": False,
-                    "think": False,
-                    "format": candidates_schema,
-                    "messages": [
-                        {"role": "system", "content": "Voce e um redator de humor brasileiro conciso e observacional."},
-                        {"role": "user", "content": writer_prompt},
-                    ],
-                    "options": {"temperature": 0.85, "num_predict": 1500},
+                writer_data = timed_generation_request(
+                    generation_calls,
+                    backend="ollama",
+                    stage="writer",
+                    round_number=round_number,
+                    payload={
+                        "model": model,
+                        "stream": False,
+                        "think": False,
+                        "format": candidates_schema,
+                        "messages": [
+                            {"role": "system", "content": "Voce e um redator de humor brasileiro conciso e observacional."},
+                            {"role": "user", "content": writer_prompt},
+                        ],
+                        "options": {"temperature": 0.85, "num_predict": 1500},
                     },
+                    timeout=timeout,
+                    url=f"{OLLAMA_URL}/api/chat",
                 )
                 writer_content = (writer_data.get("message") or {}).get("content") or ""
                 candidates = extract_json_array(writer_content)
@@ -1465,10 +1709,12 @@ Alternativas:
                 critic_user_message: dict[str, Any] = {"role": "user", "content": critic_prompt}
                 if encoded_critic_image and is_vision_capable_model(active_critic_model):
                     critic_user_message["images"] = [encoded_critic_image]
-                critic_data = timed_humor_request(
-                    f"critic_{critic_index}",
-                    round_number,
-                    {
+                critic_data = timed_generation_request(
+                    generation_calls,
+                    backend="ollama",
+                    stage=f"critic_{critic_index}",
+                    round_number=round_number,
+                    payload={
                         "model": active_critic_model,
                         "stream": False,
                         "think": False,
@@ -1479,6 +1725,8 @@ Alternativas:
                         ],
                         "options": {"temperature": 0.1, "num_predict": 900},
                     },
+                    timeout=timeout,
+                    url=f"{OLLAMA_URL}/api/chat",
                 )
                 critic_review = extract_json_object((critic_data.get("message") or {}).get("content") or "")
                 if not critic_review:
@@ -1616,12 +1864,14 @@ def generate_concepts(
     seed_candidates_by_post: dict[str, list[dict[str, Any]]] | None = None,
     source_reviews: dict[str, dict[str, Any]] | None = None,
     image_paths: dict[str, str] | None = None,
+    generation_calls_by_post: dict[str, list[dict[str, Any]]] | None = None,
     checkpoint: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, str]]:
     visual_descriptions = visual_descriptions or {}
     seed_candidates_by_post = seed_candidates_by_post or {}
     source_reviews = source_reviews or {}
     image_paths = image_paths or {}
+    generation_calls_by_post = generation_calls_by_post or {}
     compact_posts = [
         {
             "index": idx,
@@ -1727,6 +1977,11 @@ Posts:
             "source_visual_description": visual_description,
             "source_review": deepcopy(source_reviews.get(post.id) or {}),
         }
+        pre_concept_calls = generation_calls_by_post.get(post.id) or []
+        if pre_concept_calls:
+            concept.setdefault("execution", {"state": "pending", "attempts": {}})["generation_calls"] = list(
+                pre_concept_calls
+            )
         if isinstance(item.get("video_script"), dict):
             concept["video_script"] = item["video_script"]
             concept["video_script"].setdefault("source_visual_description", visual_description)
@@ -2358,7 +2613,9 @@ def sanitize_visual_description(value: str) -> str:
     return value[:1200]
 
 
-def describe_source_image(image_path: Path, model: str, timeout: int) -> str:
+def describe_source_image(
+    image_path: Path, model: str, timeout: int, calls: list[dict[str, Any]] | None = None
+) -> str:
     if not image_path.exists():
         return ""
     try:
@@ -2383,17 +2640,19 @@ def describe_source_image(image_path: Path, model: str, timeout: int) -> str:
             "If a dangerous object appears, describe it only as a generic handheld prop without operational detail. "
             "Respond in concise Portuguese, 5 to 8 bullet-like clauses, no markdown."
         )
-        data = request_json(
-            "POST",
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "stream": False,
-                "messages": [{"role": "user", "content": prompt, "images": [encoded]}],
-                "options": {"temperature": 0.2},
-            },
-            timeout=timeout,
-        )
+        payload = {
+            "model": model,
+            "stream": False,
+            "messages": [{"role": "user", "content": prompt, "images": [encoded]}],
+            "options": {"temperature": 0.2},
+        }
+        if calls is not None:
+            data = timed_generation_request(
+                calls, backend="ollama", stage="vision_description",
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
+        else:
+            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
         return sanitize_visual_description((data.get("message") or {}).get("content") or "")
     except Exception as exc:  # noqa: BLE001
         print(f"WARN could not describe source image {image_path.name}: {exc}")
@@ -2421,6 +2680,9 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
         normalized_scores["text_independence"] = min(normalized_scores["text_independence"], 2.0)
         normalized_scores["visual_clarity"] = min(normalized_scores["visual_clarity"], 3.0)
         reason = "colagem de fotos distintas nao serve para I2V de cena unica; " + reason
+    if bool(review.get("open_scene_no_intrinsic_motion")):
+        normalized_scores["motion_potential"] = min(normalized_scores["motion_potential"], 2.0)
+        reason = "cena aberta sem sujeito em close nem elemento intrinsecamente movel; " + reason
     approved = (
         bool(review.get("approved"))
         and normalized_scores["source_match"] >= 4
@@ -2432,6 +2694,7 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
         "approved": approved,
         "scores": normalized_scores,
         "reason": reason,
+        "resting_domestic_animal_scene": bool(review.get("resting_domestic_animal_scene")),
     }
 
 
@@ -2441,6 +2704,7 @@ def assess_source_suitability(
     visual_description: str,
     model: str,
     timeout: int,
+    calls: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     schema = {
         "type": "object",
@@ -2448,6 +2712,8 @@ def assess_source_suitability(
             "approved": {"type": "boolean"},
             "embedded_text_carries_meaning": {"type": "boolean"},
             "multi_photo_collage": {"type": "boolean"},
+            "open_scene_no_intrinsic_motion": {"type": "boolean"},
+            "resting_domestic_animal_scene": {"type": "boolean"},
             "scores": {
                 "type": "object",
                 "properties": {
@@ -2460,7 +2726,10 @@ def assess_source_suitability(
             },
             "reason": {"type": "string"},
         },
-        "required": ["approved", "embedded_text_carries_meaning", "multi_photo_collage", "scores", "reason"],
+        "required": [
+            "approved", "embedded_text_carries_meaning", "multi_photo_collage",
+            "open_scene_no_intrinsic_motion", "resting_domestic_animal_scene", "scores", "reason",
+        ],
     }
     try:
         with Image.open(image_path) as image:
@@ -2484,28 +2753,37 @@ Pontue de 0 a 5:
 
 Rejeite miniatura que nao mostre a acao do titulo, documento/screenshot dependente de leitura,
 imagem ambigua ou fonte que exigiria inventar personagem, objeto ou local.
-Responda tambem dois campos booleanos obrigatorios, de forma literal:
+Responda tambem tres campos booleanos obrigatorios, de forma literal:
 - embedded_text_carries_meaning: true se a imagem contem legenda, manchete, tweet ou texto
   embutido que carrega o significado do post (a piada so faz sentido lendo esse texto).
 - multi_photo_collage: true se a imagem e uma colagem/lado-a-lado de duas ou mais fotos ou
   pessoas distintas comparadas entre si (I2V anima uma unica cena, nao uma comparacao).
+- open_scene_no_intrinsic_motion: true se a cena é aberta com o sujeito principal pequeno ou
+  distante da câmera, e nada na imagem é intrinsecamente móvel (fogo, água, fumaça, multidão,
+  rosto em close) — nesse caso um modelo I2V não anima nada de verdade e o vídeo fica estático.
+- resting_domestic_animal_scene: true se o sujeito principal é um animal doméstico (cão,
+  gato) parado, deitado ou dormindo em um ambiente interno/doméstico — esse tipo de cena é
+  um atrator conhecido de distorção no render I2V (a cena inteira muda de forma
+  imprevisível), mesmo quando o resto da imagem é clara e adequada.
 Responda somente JSON.
 Formato exato: {{"approved": false, "scores": {{"source_match": 0, "visual_clarity": 0,
 "motion_potential": 0, "text_independence": 0}}, "reason": "..."}}
 """.strip()
-        data = request_json(
-            "POST",
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "stream": False,
-                "think": False,
-                "format": schema,
-                "messages": [{"role": "user", "content": prompt}],
-                "options": {"temperature": 0, "seed": 20260705, "num_predict": 250},
-            },
-            timeout=timeout,
-        )
+        payload = {
+            "model": model,
+            "stream": False,
+            "think": False,
+            "format": schema,
+            "messages": [{"role": "user", "content": prompt}],
+            "options": {"temperature": 0, "seed": 20260705, "num_predict": 250},
+        }
+        if calls is not None:
+            data = timed_generation_request(
+                calls, backend="ollama", stage="source_suitability",
+                payload=payload, timeout=timeout, url=f"{OLLAMA_URL}/api/chat",
+            )
+        else:
+            data = request_json("POST", f"{OLLAMA_URL}/api/chat", json=payload, timeout=timeout)
         review = extract_json_object((data.get("message") or {}).get("content") or "")
         if not review:
             raise ValueError("source suitability model did not return JSON")
@@ -2523,9 +2801,10 @@ def prepare_source_media(
     posts: list[reddit.RedditPost],
     run_dir: Path,
     args: argparse.Namespace,
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, list[dict[str, Any]]]]:
     source_media_paths: dict[str, str] = {}
     visual_descriptions: dict[str, str] = {}
+    generation_calls_by_post: dict[str, list[dict[str, Any]]] = {}
     only_indexes = set(args.only_index or [])
     for idx, post in enumerate(posts, 1):
         if only_indexes and idx not in only_indexes:
@@ -2535,11 +2814,14 @@ def prepare_source_media(
         if path:
             source_media_paths[post.id] = path
         if args.describe_source_images and post.media_type == "image" and path:
-            description = describe_source_image(Path(path), args.vision_model, args.vision_timeout)
+            calls: list[dict[str, Any]] = []
+            description = describe_source_image(Path(path), args.vision_model, args.vision_timeout, calls)
+            if calls:
+                generation_calls_by_post[post.id] = calls
             if description:
                 visual_descriptions[post.id] = description
                 print(f"Source image described {idx}/{len(posts)}: {post.title[:70]}")
-    return source_media_paths, visual_descriptions
+    return source_media_paths, visual_descriptions, generation_calls_by_post
 
 
 def load_font(size: int, font_path: Path) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -3168,6 +3450,32 @@ def finish_ltx23_with_tts(
     return output_path
 
 
+def format_video_916(input_path: Path, output_path: Path) -> Path:
+    """Fit any validated render into a 1080x1920 canvas for Shorts/Reels/TikTok: blurred
+    cover of the clip as background, the clip itself contained and centered on top. One
+    graph handles portrait and landscape sources alike; audio is copied untouched."""
+
+    filter_complex = (
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+        "crop=1080:1920,boxblur=luma_radius=24:luma_power=2[bg];"
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2[vout]"
+    )
+    run_ffmpeg(
+        [
+            "-i", str(input_path),
+            "-filter_complex", filter_complex,
+            "-map", "[vout]", "-map", "0:a?",
+            "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    return output_path
+
+
 def render_photomotion_meme(
     source_photo_path: Path,
     concept: dict[str, Any],
@@ -3411,6 +3719,8 @@ def render_ltx_video_meme(
                 concept, output_path.parent, output_path.stem, args
             )
             frames = ltx_valid_frame_count(math.ceil(narration_total * args.ltx23_fps))
+            if args.ltx23_input_mode == "prompt":
+                frames = min(frames, LTX23_T2V_TTS_MAX_FRAMES)
             concept["narration"] = narration_meta
             print(
                 f"  narration: {narration_total:.2f}s measured -> {frames} frames "
@@ -3459,18 +3769,43 @@ def render_ltx_video_meme(
                 segment_prefix = f"{prefix}-segment-{segment_index}"
                 segment_output = output_path.with_name(f"{output_path.stem}-segment-{segment_index}.mp4")
             segment_seed = seed + segment_index - 1
-            prompt_id = queue_comfy_ltx23_native_video(
-                concept,
-                post,
-                segment_prefix,
-                segment_seed,
-                args,
-                video_prompt_override=segment_prompt_text,
-                frames_override=frames,
-                reference_image_path=current_reference,
-            )
-            ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
-            download_comfy_file(ref, segment_output)
+            render_call_record = {
+                "backend": "comfyui",
+                "stage": "ltx_render",
+                "round": segment_index,
+                "model": (LTX23_I2V_API_WORKFLOW if current_reference else LTX23_API_WORKFLOW).name,
+                "prompt": segment_prompt_text,
+                "options": {
+                    "seed": segment_seed,
+                    "frames": frames,
+                    "fps": args.ltx23_fps,
+                    "width": args.ltx23_width,
+                    "height": args.ltx23_height,
+                    "input_mode": "image-to-video" if current_reference else "text-to-video",
+                },
+                "state": "running",
+            }
+            concept.setdefault("execution", {"state": "pending", "attempts": {}}).setdefault(
+                "generation_calls", []
+            ).append(render_call_record)
+            try:
+                prompt_id = queue_comfy_ltx23_native_video(
+                    concept,
+                    post,
+                    segment_prefix,
+                    segment_seed,
+                    args,
+                    video_prompt_override=segment_prompt_text,
+                    frames_override=frames,
+                    reference_image_path=current_reference,
+                )
+                ref = wait_for_comfy_video(prompt_id, args.video_render_timeout, args.poll_seconds)
+                download_comfy_file(ref, segment_output)
+            except Exception as exc:  # noqa: BLE001 - failure itself is the useful audit signal here
+                render_call_record["state"] = "failed"
+                render_call_record["error"] = str(exc)
+                raise
+            render_call_record["state"] = "completed"
             segment_paths.append(segment_output)
             segment_records.append(
                 {
@@ -3502,10 +3837,14 @@ def render_ltx_video_meme(
         if segment_count > 1:
             concatenate_video_segments(segment_paths, output_path)
         if narration_path is not None and narration_total is not None:
-            finish_ltx23_with_tts(segment_paths[0], narration_path, narration_total, output_path)
+            # frames may have been capped below what the narration alone would need (see
+            # LTX23_T2V_TTS_MAX_FRAMES); never ask ffmpeg to trim to a duration longer than
+            # what was actually rendered.
+            mux_duration = min(narration_total, frames / args.ltx23_fps)
+            finish_ltx23_with_tts(segment_paths[0], narration_path, mux_duration, output_path)
             segment_paths[0].unlink(missing_ok=True)
             narration_path.unlink(missing_ok=True)
-            concept["video_duration_seconds"] = narration_total
+            concept["video_duration_seconds"] = mux_duration
         else:
             concept["video_duration_seconds"] = segment_count * frames / args.ltx23_fps
         concept["native_audio"] = audio_mode == "native"
@@ -3562,6 +3901,25 @@ def send_telegram_album(paths: list[Path], summary: str) -> None:
         timeout=30,
     )
     response.raise_for_status()
+
+
+def send_telegram_videos(entries: list[tuple[Path, str]]) -> None:
+    """Send publish-ready 9:16 videos, one message each, caption = paste-ready text."""
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    raw_users = os.environ.get("TELEGRAM_ALLOWED_USERS", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", raw_users.split(",")[0].strip() if raw_users else "").strip()
+    if not token or not chat_id:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID/TELEGRAM_ALLOWED_USERS are required")
+    for path, caption in entries:
+        with path.open("rb") as handle:
+            response = requests.post(
+                f"https://api.telegram.org/bot{token}/sendVideo",
+                data={"chat_id": chat_id, "caption": caption[:1024], "supports_streaming": True},
+                files={"video": (path.name, handle, "video/mp4")},
+                timeout=300,
+            )
+        response.raise_for_status()
 
 
 def build_summary(posts: list[reddit.RedditPost], concepts: list[dict[str, str]]) -> str:
@@ -3625,6 +3983,7 @@ def concept_document(post: reddit.RedditPost, concept: dict[str, Any], index: in
             "paths": path_fields,
             "metadata": deepcopy(concept.get("artifact_metadata") or {}),
         },
+        "publish": deepcopy(concept.get("publish") or {}),
         "execution": deepcopy(
             concept.get("execution")
             or {"state": "approved" if concept.get("quality_approved") else "rejected", "attempts": {}}
@@ -3641,11 +4000,15 @@ def validate_concepts_document(document: Any, *, require_artifacts: bool = False
         if not isinstance(item, dict):
             errors.append(f"{prefix} must be an object")
             continue
-        if item.get("schema_version") != CONCEPT_SCHEMA_VERSION:
-            errors.append(f"{prefix}.schema_version must be {CONCEPT_SCHEMA_VERSION}")
+        if item.get("schema_version") not in SUPPORTED_CONCEPT_SCHEMA_VERSIONS:
+            errors.append(
+                f"{prefix}.schema_version must be one of {sorted(SUPPORTED_CONCEPT_SCHEMA_VERSIONS)}"
+            )
         for section in ("post", "joke", "evaluations", "production", "artifacts", "execution"):
             if not isinstance(item.get(section), dict):
                 errors.append(f"{prefix}.{section} must be an object")
+        if "publish" in item and not isinstance(item.get("publish"), dict):
+            errors.append(f"{prefix}.publish must be an object when present")
         joke = item.get("joke") if isinstance(item.get("joke"), dict) else {}
         for field in ("setup", "punchline", "logic"):
             if not isinstance(joke.get(field), str) or not joke.get(field).strip():
@@ -3701,6 +4064,7 @@ def hydrate_concept_record(record: dict[str, Any]) -> tuple[reddit.RedditPost, d
         "narration": deepcopy(production.get("narration") or {}),
         "artifact_metadata": deepcopy(artifacts.get("metadata") or {}),
         "execution": execution,
+        "publish": deepcopy(record.get("publish") or {}),
         "humor_approved": bool((evaluations.get("humor") or {}).get("approved")),
         "quality_approved": bool((evaluations.get("quality") or {}).get("approved")),
     }
@@ -4028,6 +4392,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-critic-model", default="gemma3:12b")
     parser.add_argument("--humor-model", default="gemma4:31b")
     parser.add_argument(
+        "--publish-model",
+        default=None,
+        help="Ollama model for publish metadata (title/description/topics/hashtags); defaults to --humor-model.",
+    )
+    parser.add_argument(
         "--humor-critic-model",
         default="llama3:latest",
         help="Independent Ollama model used only to review humor candidates.",
@@ -4102,8 +4471,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ltx23-input-mode",
         choices=("image", "source", "prompt"),
-        default="source",
-        help="source (default, user-validated 2026-07-18) animates the real downloaded photo; image uses the generated clean base image; prompt keeps the T2V validation path.",
+        default="prompt",
+        help=(
+            "prompt (default, user-validated 2026-07-21) is T2V from a literal cinematic scene "
+            "description, no reference image; source animates the real downloaded photo (I2V); "
+            "image uses the generated clean base image (I2V)."
+        ),
     )
     parser.add_argument("--ltx23-lora-name", default=DEFAULT_LTX23_LORA)
     parser.add_argument("--ltx23-lora-strength", type=float, default=0.5)
@@ -4123,7 +4496,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--ltx23-fps", type=float, default=25.0)
     parser.add_argument("--ltx23-steps", type=int, default=8)
-    parser.add_argument("--ltx23-audio-cfg", type=float, default=7.0)
+    parser.add_argument("--ltx23-audio-cfg", type=float, default=3.0)
     parser.add_argument("--ltx23-video-cfg", type=float, default=3.0)
     parser.add_argument("--ltx23-sampler-name", default="euler_cfg_pp")
     parser.add_argument("--ltx23-decode-tiles", type=int, default=2)
@@ -4220,7 +4593,7 @@ def main() -> int:
     write_json(run_dir / "selected.json", [asdict(post) for post in posts])
     if not args.no_render:
         free_comfy_memory()
-    source_media_paths, visual_descriptions = prepare_source_media(posts, run_dir, args)
+    source_media_paths, visual_descriptions, generation_calls_by_post = prepare_source_media(posts, run_dir, args)
     source_reviews: dict[str, dict[str, Any]] = {}
     if approved_resume:
         for post, concept in zip(posts, concepts):
@@ -4242,12 +4615,14 @@ def main() -> int:
                     "reason": "controlled I2V experiment requires a downloaded source image",
                 }
                 continue
+            source_calls = generation_calls_by_post.setdefault(post.id, [])
             source_reviews[post.id] = assess_source_suitability(
                 post,
                 Path(source_path),
                 visual_descriptions.get(post.id, ""),
                 args.source_critic_model,
                 args.vision_timeout,
+                source_calls,
             )
             print(
                 f"Source gate {post.id}: "
@@ -4257,6 +4632,12 @@ def main() -> int:
 
         if args.skip_ollama_concepts:
             concepts = [fallback_concept(post, visual_descriptions.get(post.id, "")) for post in posts]
+            for post, concept in zip(posts, concepts):
+                pre_concept_calls = generation_calls_by_post.get(post.id) or []
+                if pre_concept_calls:
+                    concept.setdefault("execution", {"state": "pending", "attempts": {}})["generation_calls"] = list(
+                        pre_concept_calls
+                    )
         else:
             def checkpoint_partial(partial: list[dict[str, Any]]) -> None:
                 # Best-effort: losing a checkpoint must never abort the batch.
@@ -4276,6 +4657,7 @@ def main() -> int:
                 seed_candidates_by_post=seed_candidates_by_post,
                 source_reviews=source_reviews,
                 image_paths=source_media_paths,
+                generation_calls_by_post=generation_calls_by_post,
                 checkpoint=checkpoint_partial,
             )
         for concept in concepts:
@@ -4286,6 +4668,27 @@ def main() -> int:
                 "approved" if approved else "rejected",
                 str((concept.get("quality_review") or {}).get("reason", "")),
             )
+    publish_model = args.publish_model or args.humor_model
+    publish_generated = False
+    for idx, (post, concept) in enumerate(zip(posts, concepts), 1):
+        if not (concept.get("humor_approved") and concept.get("quality_approved")):
+            continue
+        existing = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+        if existing.get("status") == "approved":
+            prepare_publish_package(run_dir, idx, slugify(post.title), concept)
+            continue
+        print(f"Generating publish metadata {idx}/{len(posts)}: {post.title[:60]}")
+        concept["publish"] = generate_publish_metadata(
+            post, concept, f"{run_tag}-{idx:02d}", publish_model, args.concept_timeout
+        )
+        publish_generated = True
+        if concept["publish"]["status"] == "approved":
+            prepare_publish_package(run_dir, idx, slugify(post.title), concept)
+        else:
+            issues = "; ".join(concept["publish"].get("issues") or [])
+            print(f"WARN publish metadata failed (render continues): {issues[:200]}")
+    if publish_generated:
+        flush_ollama(publish_model)
     persist_concepts(run_dir / "concepts.json", posts, concepts)
     if not approved_resume:
         flush_ollama(args.ollama_model)
@@ -4370,6 +4773,15 @@ def main() -> int:
                             render_ltx_video_meme(post, concept, source_media_path, final_path, video_output_path, args)
                     concept["video_path"] = str(video_output_path)
                     concept["artifact_metadata"] = probe_video_artifact(video_output_path)
+                    publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+                    if publish.get("status") == "approved":
+                        package_dir = run_dir / f"{idx:02d}-{slug}"
+                        package_dir.mkdir(parents=True, exist_ok=True)
+                        try:
+                            final_916_path = format_video_916(video_output_path, package_dir / "final_916.mp4")
+                            concept["final_916_path"] = str(final_916_path)
+                        except Exception as exc:  # noqa: BLE001 - native validated MP4 stays the deliverable
+                            print(f"WARN 9:16 formatting failed; keeping native MP4: {exc}")
                     video_paths.append(video_output_path)
                 if final_path is not None:
                     final_paths.append(final_path)
@@ -4385,10 +4797,22 @@ def main() -> int:
     (run_dir / "summary.md").write_text(summary, encoding="utf-8")
     (run_dir / "human-review.md").write_text(build_human_review_sheet(posts, concepts), encoding="utf-8")
 
-    if final_paths and args.telegram:
-        send_telegram_album(final_paths, summary)
-        print(f"Telegram sent: {len(final_paths)} images")
-    elif not args.telegram:
+    publish_videos: list[tuple[Path, str]] = []
+    for concept in concepts:
+        publish = concept.get("publish") if isinstance(concept.get("publish"), dict) else {}
+        final_916 = str(concept.get("final_916_path") or "")
+        if publish.get("status") == "approved" and final_916 and Path(final_916).is_file():
+            caption = f"{publish.get('title', '')}\n\n{publish.get('description_with_hashtags', '')}"
+            publish_videos.append((Path(final_916), caption))
+
+    if args.telegram:
+        if final_paths:
+            send_telegram_album(final_paths, summary)
+            print(f"Telegram sent: {len(final_paths)} images")
+        if publish_videos:
+            send_telegram_videos(publish_videos)
+            print(f"Telegram sent: {len(publish_videos)} publish videos")
+    else:
         print("Telegram disabled by default; not sending. Use --telegram to opt in.")
 
     print(f"Artifacts: {run_dir}")

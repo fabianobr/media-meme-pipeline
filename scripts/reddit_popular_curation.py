@@ -81,6 +81,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def prioritize_portrait(approved: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Portrait sources first (they fill the 9:16 canvas without blur-pad) among sources
+    that are not a known LTX drift-attractor risk, preserving curation order within each
+    group. Both priorities are soft only — landscape and drift-risk sources stay eligible,
+    never dropped."""
+
+    return sorted(
+        approved,
+        key=lambda item: (1 if item.get("drift_risk") else 0, 0 if item.get("portrait") else 1),
+    )
+
+
 def main() -> int:
     args = build_parser().parse_args()
     args.comfyui_url = None
@@ -172,6 +184,8 @@ def main() -> int:
                     "post": asdict(post),
                     "media_path": media_path,
                     "media_resolution": [width, height],
+                    "portrait": height > width,
+                    "drift_risk": bool(review.get("resting_domestic_animal_scene")),
                     "visual_description": description,
                     "review": review,
                     "curated_at": datetime.now(timezone.utc).isoformat(),
@@ -182,7 +196,7 @@ def main() -> int:
         # Save after every evaluated post, not just at the end: vision-model calls are slow
         # (each image needs two Ollama round-trips) and a run can be interrupted or time out
         # partway through — losing unsaved progress means redoing those calls for nothing.
-        backlog["approved"] = approved
+        backlog["approved"] = prioritize_portrait(approved)
         backlog["seen_ids"] = sorted(seen_ids)
         save_backlog(args.backlog_file, backlog)
 
