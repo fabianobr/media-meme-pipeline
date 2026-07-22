@@ -22,14 +22,18 @@ class ServiceUrlTests(unittest.TestCase):
         self.assertFalse(pipeline.build_parser().parse_args([]).telegram)
         self.assertTrue(pipeline.build_parser().parse_args(["--telegram"]).telegram)
 
-    def test_ltx23_defaults_to_real_photo_with_tts_narration(self) -> None:
-        # User-validated recipe (2026-07-18): animate the real source photo, replace the
-        # unreliable native audio with a measured local-TTS narration.
+    def test_ltx23_defaults_to_t2v_prompt_with_tts_narration(self) -> None:
+        # User-validated recipe (2026-07-21): T2V from a detailed literal scene description
+        # (no reference image), replacing the unreliable native audio with a measured
+        # local-TTS narration. Supersedes the 2026-07-18 I2V-from-source-photo default —
+        # T2V with a detailed prompt reads as clearly better ("nitidamente melhor") than I2V
+        # for the same source photo. See docs/roadmap.md item 20.
         args = pipeline.build_parser().parse_args([])
         self.assertEqual(args.video_engine, "ltx23")
-        self.assertEqual(args.ltx23_input_mode, "source")
+        self.assertEqual(args.ltx23_input_mode, "prompt")
         self.assertEqual(args.ltx23_audio_mode, "tts")
         self.assertEqual(args.tts_backend, "piper")
+        self.assertEqual(args.ltx23_audio_cfg, 3.0)
 
     def test_environment_overrides_localhost(self) -> None:
         args = argparse.Namespace(ollama_url=None, comfyui_url=None, n8n_url=None)

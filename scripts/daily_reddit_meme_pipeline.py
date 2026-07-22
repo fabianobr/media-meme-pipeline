@@ -55,6 +55,11 @@ DEFAULT_LTX23_LORA = "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_
 DEFAULT_LTX23_UPSCALER = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 LTX23_API_WORKFLOW = PROJECT_ROOT / "workflows" / "03-ltx23-native-t2v-audio-api.json"
 LTX23_I2V_API_WORKFLOW = PROJECT_ROOT / "workflows" / "05-ltx23-official-i2v-audio-api.json"
+# T2V native workflow's joint audio/video latent produces NaN in the AAC encode past this
+# length regardless of audio CFG (confirmed by bisection: 353 frames/14.12s renders clean,
+# 369/14.76s and 377/15.08s both fail) -- see docs/roadmap.md item 20. Audio is discarded and
+# replaced by TTS in the default audio_mode anyway, so capping here is safe.
+LTX23_T2V_TTS_MAX_FRAMES = 353
 N8N_URL = "http://localhost:5678"
 N8N_GENERATE_URL = f"{N8N_URL}/webhook/comfyui-media-generate"
 N8N_STATUS_URL = f"{N8N_URL}/webhook/comfyui-media-status"
@@ -922,7 +927,7 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
         elif archetype == "boss_fight":
             action = [
                 "0-3s: the subject notices the scene and holds a serious stare.",
-                "3-7s: camera slowly pushes in while the subject makes one tiny cautious movement.",
+                "3-7s: the subject makes one tiny cautious movement, staying in frame.",
                 "7-10s: the subject pauses, then gives a defeated look to camera.",
             ]
             beat = "ordinary source-image subject staged like a final boss"
@@ -954,7 +959,7 @@ def build_video_script(post: reddit.RedditPost, concept: dict[str, str], visual_
             "character": character,
             "main_prop": prop,
             "source_visual_description": visual_description,
-            "camera": "Single continuous shot, preserve source framing, very slow push-in, no cuts, no scene transition.",
+            "camera": "Single continuous shot, static camera, preserve source framing, no push-in, no cuts, no scene transition.",
             "timeline": action,
             "comedy_beat": beat,
             "dialogue": dialogue,
@@ -3714,6 +3719,8 @@ def render_ltx_video_meme(
                 concept, output_path.parent, output_path.stem, args
             )
             frames = ltx_valid_frame_count(math.ceil(narration_total * args.ltx23_fps))
+            if args.ltx23_input_mode == "prompt":
+                frames = min(frames, LTX23_T2V_TTS_MAX_FRAMES)
             concept["narration"] = narration_meta
             print(
                 f"  narration: {narration_total:.2f}s measured -> {frames} frames "
@@ -3830,10 +3837,14 @@ def render_ltx_video_meme(
         if segment_count > 1:
             concatenate_video_segments(segment_paths, output_path)
         if narration_path is not None and narration_total is not None:
-            finish_ltx23_with_tts(segment_paths[0], narration_path, narration_total, output_path)
+            # frames may have been capped below what the narration alone would need (see
+            # LTX23_T2V_TTS_MAX_FRAMES); never ask ffmpeg to trim to a duration longer than
+            # what was actually rendered.
+            mux_duration = min(narration_total, frames / args.ltx23_fps)
+            finish_ltx23_with_tts(segment_paths[0], narration_path, mux_duration, output_path)
             segment_paths[0].unlink(missing_ok=True)
             narration_path.unlink(missing_ok=True)
-            concept["video_duration_seconds"] = narration_total
+            concept["video_duration_seconds"] = mux_duration
         else:
             concept["video_duration_seconds"] = segment_count * frames / args.ltx23_fps
         concept["native_audio"] = audio_mode == "native"
@@ -4460,8 +4471,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ltx23-input-mode",
         choices=("image", "source", "prompt"),
-        default="source",
-        help="source (default, user-validated 2026-07-18) animates the real downloaded photo; image uses the generated clean base image; prompt keeps the T2V validation path.",
+        default="prompt",
+        help=(
+            "prompt (default, user-validated 2026-07-21) is T2V from a literal cinematic scene "
+            "description, no reference image; source animates the real downloaded photo (I2V); "
+            "image uses the generated clean base image (I2V)."
+        ),
     )
     parser.add_argument("--ltx23-lora-name", default=DEFAULT_LTX23_LORA)
     parser.add_argument("--ltx23-lora-strength", type=float, default=0.5)
@@ -4481,7 +4496,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--ltx23-fps", type=float, default=25.0)
     parser.add_argument("--ltx23-steps", type=int, default=8)
-    parser.add_argument("--ltx23-audio-cfg", type=float, default=7.0)
+    parser.add_argument("--ltx23-audio-cfg", type=float, default=3.0)
     parser.add_argument("--ltx23-video-cfg", type=float, default=3.0)
     parser.add_argument("--ltx23-sampler-name", default="euler_cfg_pp")
     parser.add_argument("--ltx23-decode-tiles", type=int, default=2)

@@ -259,6 +259,52 @@ class LtxRenderWiringTests(unittest.TestCase):
         self.assertEqual(calls[0]["options"]["width"], args.ltx23_width)
         self.assertEqual(calls[0]["options"]["height"], args.ltx23_height)
 
+    def test_t2v_tts_mode_caps_frames_below_native_audio_nan_ceiling(self) -> None:
+        # A very long narration must never push the T2V native-audio-video workflow past
+        # LTX23_T2V_TTS_MAX_FRAMES: bisection confirmed the joint audio/video latent produces
+        # NaN in the AAC encode above ~14.1s regardless of audio CFG (docs/roadmap.md item 20).
+        import tempfile
+
+        post = pipeline.reddit.RedditPost(
+            subreddit="popular", id="t3_ltxcap", title="A long story", author="/u/demo",
+            url="https://example.com", updated="2026-07-21T00:00:00+00:00",
+            summary="", rank=1, media_type="image", media_url="",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            concept: dict = {"top_text": "A", "middle_text": "B", "bottom_text": "C"}
+            output_path = tmp_path / "out.mp4"
+            narration_path = tmp_path / "out-narration.m4a"
+            narration_path.write_bytes(b"fake")
+            args = pipeline.build_parser().parse_args([
+                "--ltx23-input-mode", "prompt", "--ltx23-audio-mode", "tts",
+                "--output-root", str(tmp_path),
+            ])
+            queued: dict = {}
+
+            def _capture_queue(*_args, **kwargs):
+                queued.update(kwargs)
+                return "prompt-id-cap"
+
+            with patch.object(
+                pipeline, "synthesize_narration_track",
+                return_value=(narration_path, 20.0, {"tts_backend": "piper"}),
+            ), patch.object(
+                pipeline, "compose_ltx23_segment_prompts", return_value=["a long story, literal prompt"]
+            ), patch.object(
+                pipeline, "queue_comfy_ltx23_native_video", side_effect=_capture_queue
+            ), patch.object(
+                pipeline, "wait_for_comfy_video", return_value={"filename": "x", "subfolder": "", "type": "output"}
+            ), patch.object(
+                pipeline, "download_comfy_file"
+            ), patch.object(
+                pipeline, "finish_ltx23_with_tts", return_value=output_path
+            ) as finish_mock:
+                pipeline.render_ltx_video_meme(post, concept, "", None, output_path, args)
+            self.assertEqual(queued["frames_override"], pipeline.LTX23_T2V_TTS_MAX_FRAMES)
+            mux_duration = finish_mock.call_args[0][2]
+            self.assertAlmostEqual(mux_duration, pipeline.LTX23_T2V_TTS_MAX_FRAMES / args.ltx23_fps)
+
     def test_segment_render_failure_records_failed_call(self) -> None:
         import tempfile
 

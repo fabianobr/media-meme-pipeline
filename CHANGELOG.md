@@ -7,7 +7,22 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 
 ## [Unreleased]
 
+### Changed
+- Defaults do render LTX 2.3 trocados para a receita validada pelo usuário (2026-07-21):
+  `--ltx23-input-mode prompt` (T2V a partir de descrição de cena literal, sem imagem de
+  referência — "nitidamente melhor" que I2V no caso testado) substitui `source` (I2V da foto
+  real) como default; `--ltx23-audio-cfg` 7.0→3.0 (CFG alto reproduzia o bug de NaN abaixo,
+  sem ganho percebido de qualidade). `build_video_script()`: câmera fixa trocada de "very
+  slow push-in" para "static camera, no push-in" (bate com o padrão do baseline aprovado
+  pelo usuário); ação do arquétipo `boss_fight` não referencia mais movimento de câmera.
+
 ### Fixed
+- Novo teto `LTX23_T2V_TTS_MAX_FRAMES` (353 frames / 14.12s): o branch de áudio nativo do
+  workflow T2V (`workflows/03-ltx23-native-t2v-audio-api.json`) produz NaN/Inf no encode AAC
+  em durações maiores, **independente do CFG de áudio** (confirmado por busca binária: 353
+  frames renderiza limpo, 369 e 377 sempre quebram). Só afeta `--ltx23-input-mode prompt`
+  combinado com `--ltx23-audio-mode tts`; a duração de mux com a narração TTS agora nunca
+  excede a duração real renderizada.
 - `build_video_script()`: regex de detecção de sujeito humano só reconhecia formas
   singulares em português (`homem`, `mulher`, `pessoa`...); descrições de fonte no plural
   ("Dois homens...") caíam no fallback genérico de animal, que instrui o sujeito a "stay
