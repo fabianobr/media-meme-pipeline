@@ -4467,8 +4467,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--humor-model", default="gemma4:31b")
     parser.add_argument(
         "--publish-model",
-        default=None,
-        help="Ollama model for publish metadata (title/description/topics/hashtags); defaults to --humor-model.",
+        default="qwen3:14b",
+        help="Ollama model for publish metadata (title/description/topics/hashtags); independent of --humor-model. See docs/roadmap.md item 22 for the default choice.",
     )
     parser.add_argument(
         "--humor-critic-model",

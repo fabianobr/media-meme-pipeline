@@ -276,11 +276,11 @@ class CurationPortraitTests(unittest.TestCase):
 
 
 class PipelineWiringTests(unittest.TestCase):
-    def test_publish_model_flag_defaults_to_none(self) -> None:
+    def test_publish_model_flag_defaults_to_qwen3_14b(self) -> None:
         args = pipeline.build_parser().parse_args([])
-        self.assertIsNone(args.publish_model)
-        args = pipeline.build_parser().parse_args(["--publish-model", "qwen3:14b"])
         self.assertEqual(args.publish_model, "qwen3:14b")
+        args = pipeline.build_parser().parse_args(["--publish-model", "llama3:latest"])
+        self.assertEqual(args.publish_model, "llama3:latest")
 
     def test_prepare_publish_package_writes_json_and_txt(self) -> None:
         import json
