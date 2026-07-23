@@ -4739,7 +4739,7 @@ def main() -> int:
                 "approved" if approved else "rejected",
                 str((concept.get("quality_review") or {}).get("reason", "")),
             )
-    publish_model = args.publish_model or args.humor_model
+    publish_model = args.publish_model
     publish_generated = False
     for idx, (post, concept) in enumerate(zip(posts, concepts), 1):
         if not (concept.get("humor_approved") and concept.get("quality_approved")):
