@@ -4303,6 +4303,45 @@ def run_preflight(args: argparse.Namespace) -> dict[str, Any]:
     return checks
 
 
+def probe_video_motion(path: Path) -> dict[str, Any]:
+    """Diagnostic-only motion signal for the audit trail. Not a pass/fail gate:
+    measured empirically that a fixed VMAF-motion threshold does not separate
+    approved vs. criticized renders across different scene archetypes (see
+    docs/roadmap.md item 21) — this exists to make regressions visible in
+    execution.generation_calls / human-review.md, not to auto-reject. The
+    returncode check on each subprocess exists so a genuine ffmpeg failure
+    raises instead of silently falling through to the regex parse, which
+    would otherwise report 0.0/False indistinguishable from a real
+    static/frozen measurement."""
+
+    motion_result = subprocess.run(
+        ["ffmpeg", "-loglevel", "info", "-i", str(path), "-vf", "vmafmotion", "-an", "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if motion_result.returncode != 0:
+        raise RuntimeError(
+            f"ffmpeg vmafmotion probe failed (exit {motion_result.returncode}): {motion_result.stderr[-500:]}"
+        )
+    motion_match = re.search(r"VMAF Motion avg:\s*([\d.]+)", motion_result.stderr)
+    motion_vmaf_avg = float(motion_match.group(1)) if motion_match else 0.0
+
+    freeze_result = subprocess.run(
+        ["ffmpeg", "-loglevel", "info", "-i", str(path), "-vf", "freezedetect=n=-60dB:d=0.5", "-an", "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if freeze_result.returncode != 0:
+        raise RuntimeError(
+            f"ffmpeg freezedetect probe failed (exit {freeze_result.returncode}): {freeze_result.stderr[-500:]}"
+        )
+    freeze_detected = "freezedetect" in freeze_result.stderr and "freeze_start" in freeze_result.stderr
+
+    return {"motion_vmaf_avg": round(motion_vmaf_avg, 3), "freeze_detected": freeze_detected}
+
+
 def probe_video_artifact(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ValueError(f"video does not exist: {path}")
@@ -4322,7 +4361,7 @@ def probe_video_artifact(path: Path) -> dict[str, Any]:
     duration = float((data.get("format") or {}).get("duration") or 0)
     if duration <= 0:
         raise ValueError("MP4 duration is invalid")
-    return {
+    metadata = {
         "duration_seconds": round(duration, 3),
         "width": int(video.get("width") or 0),
         "height": int(video.get("height") or 0),
@@ -4330,6 +4369,13 @@ def probe_video_artifact(path: Path) -> dict[str, Any]:
         "audio_codec": audio.get("codec_name", ""),
         "has_audio": True,
     }
+    try:
+        metadata.update(probe_video_motion(path))
+    except Exception as exc:  # noqa: BLE001 - motion diagnostic is informational, never blocks the render
+        print(f"WARN motion diagnostic failed (non-blocking): {exc}")
+        metadata["motion_vmaf_avg"] = None
+        metadata["freeze_detected"] = None
+    return metadata
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -4347,6 +4393,18 @@ def build_human_review_sheet(posts: list[reddit.RedditPost], concepts: list[dict
                 f"- Texto: {concept.get('top_text', '')} / {concept.get('middle_text', '')} / {concept.get('bottom_text', '')}",
                 f"- Relação declarada: {concept.get('meme_logic', '')}",
                 f"- Vídeo: {concept.get('video_path', 'não renderizado')}",
+                (
+                    "- Motion diagnostic: "
+                    + (
+                        "n/a"
+                        if not concept.get("artifact_metadata")
+                        else (
+                            f"vmaf_motion={concept['artifact_metadata'].get('motion_vmaf_avg')}, "
+                            f"freeze_detected={concept['artifact_metadata'].get('freeze_detected')} "
+                            "(informativo — comparar com reference-baseline/, não é veredito automático)"
+                        )
+                    )
+                ),
                 "- [ ] Entendi em até 2 segundos",
                 "- [ ] A piada depende desse post",
                 "- [ ] Achei engraçado",
