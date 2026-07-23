@@ -34,6 +34,14 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
   casos do experimento de comparação I2V×T2V.
 
 ### Added
+- Diagnóstico informativo de movimento/congelamento via ffmpeg (`probe_video_motion()`):
+  motion score (filtro `vmafmotion`) e detecção de freeze (`freezedetect`) rodam sobre todo
+  MP4 renderizado e ficam gravados em `artifact_metadata` e no `human-review.md`. **Nunca é
+  gate automático de aprovação/rejeição** — teste empírico achou que o vídeo criticado pelo
+  usuário como "movimento de câmera fraco" pontuou MAIOR em motion score que os dois
+  exemplares chamados de "perfeitos" (arquétipos de cena diferentes confundem o delta bruto
+  de pixel); ver `docs/roadmap.md` item 21. Retorno de processo do ffmpeg é checado — uma
+  sonda que falha aparece como não medida (`None`/`None`), nunca como um falso `0.0`/`False`.
 - Fase 2 do pacote de publicação: `scripts/record_performance.py` grava métricas de
   engajamento fornecidas manualmente pelo usuário (`--publish-id`, `--platform`, `--metric
   key=value` repetível, valores parseados como número quando possível) em log append-only
