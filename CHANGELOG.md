@@ -15,6 +15,11 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
   sem ganho percebido de qualidade). `build_video_script()`: câmera fixa trocada de "very
   slow push-in" para "static camera, no push-in" (bate com o padrão do baseline aprovado
   pelo usuário); ação do arquétipo `boss_fight` não referencia mais movimento de câmera.
+- `--publish-model` default trocado de `gemma4:31b` (herdado de `--humor-model`) para
+  `qwen3:14b`: experimento controlado (5 concepts já aprovados, sem GPU/render) deu
+  `gemma4:31b` 0/5 aprovados (timeout em todas as tentativas) vs. `qwen3:14b` 5/5 sem
+  nenhum retry; ver `docs/roadmap.md` item 22. `--humor-model` continua `gemma4:31b`
+  (tarefa diferente, já validada).
 
 ### Fixed
 - Novo teto `LTX23_T2V_TTS_MAX_FRAMES` (353 frames / 14.12s): o branch de áudio nativo do
@@ -34,6 +39,14 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
   casos do experimento de comparação I2V×T2V.
 
 ### Added
+- Diagnóstico informativo de movimento/congelamento via ffmpeg (`probe_video_motion()`):
+  motion score (filtro `vmafmotion`) e detecção de freeze (`freezedetect`) rodam sobre todo
+  MP4 renderizado e ficam gravados em `artifact_metadata` e no `human-review.md`. **Nunca é
+  gate automático de aprovação/rejeição** — teste empírico achou que o vídeo criticado pelo
+  usuário como "movimento de câmera fraco" pontuou MAIOR em motion score que os dois
+  exemplares chamados de "perfeitos" (arquétipos de cena diferentes confundem o delta bruto
+  de pixel); ver `docs/roadmap.md` item 21. Retorno de processo do ffmpeg é checado — uma
+  sonda que falha aparece como não medida (`None`/`None`), nunca como um falso `0.0`/`False`.
 - Fase 2 do pacote de publicação: `scripts/record_performance.py` grava métricas de
   engajamento fornecidas manualmente pelo usuário (`--publish-id`, `--platform`, `--metric
   key=value` repetível, valores parseados como número quando possível) em log append-only

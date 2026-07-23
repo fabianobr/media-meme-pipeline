@@ -487,6 +487,44 @@ class SourceSuitabilityMotionCapTests(unittest.TestCase):
         self.assertEqual(payload["format"]["properties"]["open_scene_no_intrinsic_motion"]["type"], "boolean")
         self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["required"])
 
+    def test_non_image_post_rejected_with_media_type_aware_reason(self) -> None:
+        post = reddit.RedditPost(
+            subreddit="test",
+            id="t3_textonly",
+            title="a text post",
+            author="someone",
+            url="https://example.com/textonly",
+            updated="2026-07-23T00:00:00Z",
+            summary="",
+            rank=1,
+            media_type="text",
+            media_url="",
+        )
+        rejection = pipeline.reject_non_image_source(post, "")
+        self.assertIsNotNone(rejection)
+        self.assertFalse(rejection["approved"])
+        self.assertIn("media_type='text'", rejection["reason"])
+        self.assertNotIn("I2V", rejection["reason"])
+        self.assertEqual(
+            rejection["scores"],
+            {name: 0.0 for name in ("source_match", "visual_clarity", "motion_potential", "text_independence")},
+        )
+
+    def test_image_post_with_source_path_returns_none(self) -> None:
+        post = reddit.RedditPost(
+            subreddit="test",
+            id="t3_hasimage",
+            title="an image post",
+            author="someone",
+            url="https://example.com/hasimage",
+            updated="2026-07-23T00:00:00Z",
+            summary="",
+            rank=1,
+            media_type="image",
+            media_url="https://example.com/hasimage.jpg",
+        )
+        self.assertIsNone(pipeline.reject_non_image_source(post, "/tmp/hasimage.jpg"))
+
 
 class SourceSuitabilityDriftRiskPassthroughTests(unittest.TestCase):
     def test_resting_domestic_animal_flag_passes_through_without_affecting_approval(self) -> None:
@@ -832,6 +870,50 @@ class ArtifactIntegrationTests(unittest.TestCase):
         self.assertEqual((metadata["width"], metadata["height"]), (320, 180))
         self.assertTrue(metadata["has_audio"])
         self.assertGreater(metadata["duration_seconds"], 0)
+
+    def test_probe_video_artifact_flags_freeze_on_static_clip(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "static.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:size=320x180:duration=2:rate=25",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-shortest", "-c:v", "libx264",
+                    "-c:a", "aac", "-pix_fmt", "yuv420p", str(output),
+                ],
+                check=True,
+                timeout=15,
+            )
+            metadata = pipeline.probe_video_artifact(output)
+        self.assertTrue(metadata["freeze_detected"])
+        self.assertEqual(metadata["motion_vmaf_avg"], 0.0)
+
+    def test_probe_video_artifact_does_not_flag_freeze_on_moving_clip(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "moving.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:duration=2:rate=25",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-shortest", "-c:v", "libx264",
+                    "-c:a", "aac", "-pix_fmt", "yuv420p", str(output),
+                ],
+                check=True,
+                timeout=15,
+            )
+            metadata = pipeline.probe_video_artifact(output)
+        self.assertFalse(metadata["freeze_detected"])
+        self.assertGreater(metadata["motion_vmaf_avg"], 0.0)
+
+    def test_probe_video_motion_raises_on_ffmpeg_failure_instead_of_reporting_zero(self) -> None:
+        # A nonexistent input makes the real ffmpeg process exit non-zero without
+        # ffmpeg's own stderr ever matching the "VMAF Motion avg:" regex. Before the
+        # returncode check this silently produced motion_vmaf_avg=0.0/freeze_detected=False
+        # — indistinguishable from a genuinely static clip. Assert it now raises instead,
+        # which propagates into probe_video_artifact()'s existing try/except and surfaces
+        # as motion_vmaf_avg=None/freeze_detected=None rather than 0.0/False.
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "does-not-exist.mp4"
+            with self.assertRaises(RuntimeError):
+                pipeline.probe_video_motion(missing)
 
 
 class ComfyWorkflowTests(unittest.TestCase):

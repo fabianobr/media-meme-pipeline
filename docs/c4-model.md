@@ -151,7 +151,7 @@ sequenceDiagram
             Operador->>Operador: revisão de texto (até 2 correções)
             CLI->>CLI: build_video_script + compose_ltx23_segment_prompts
 
-            CLI->>Ollama: generate_publish_metadata (gemma4:31b, até 3 tentativas)
+            CLI->>Ollama: generate_publish_metadata (qwen3:14b, até 3 tentativas)
             Ollama-->>CLI: título, descrição, tópicos, hashtags (ou status=failed)
 
             CLI->>Piper: synthesize_narration_track (texto pt-BR)
@@ -223,7 +223,7 @@ ex.: `views`, `likes`, `comments`).
 | `gemma4:31b` | Escritor de humor (`improve_humor_concept`) | Ollama | Melhor desempenho observado para geração de piada em pt-BR (~10% de aprovação orgânica histórica) | `temperature=0.85, num_predict=1500` |
 | `llama3:latest` | Crítico 1 de humor (texto) | Ollama | Crítica adversarial exige modelo distinto do escritor, para não repetir o viés de geração | `temperature=0.1, num_predict=900` |
 | `qwen2.5vl:7b` | Crítico 2 de humor (visão) | Ollama | Segundo crítico independente, com acesso à imagem real — corrige o falso negativo de crítico só-texto | `temperature=0.1, num_predict=900` |
-| `gemma4:31b` | Metadados de publicação (`generate_publish_metadata`) | Ollama | Reaproveita o modelo já validado para texto criativo em pt-BR; configurável via `--publish-model` | `temperature=0.4, num_predict=700`, até 3 tentativas |
+| `qwen3:14b` | Metadados de publicação (`generate_publish_metadata`) | Ollama | `gemma4:31b` (default anterior) deu 0/5 aprovados num experimento controlado (timeout em toda tentativa); `qwen3:14b` deu 5/5 sem retry — ver `docs/roadmap.md` item 22; configurável via `--publish-model` | `temperature=0.4, num_predict=700`, até 3 tentativas |
 | LTX 2.3 (distilled LoRA) | Render de vídeo I2V | ComfyUI | Único motor de vídeo local integrado; regime distilled exige CFG=1.0 e sigmas manuais | grafo `workflows/05-ltx23-official-i2v-audio-api.json`, CFG 1.0, base half-res + upscale ×2 + refine 3 steps |
 
 Todas as chamadas a Ollama passam por `timed_generation_request` (`daily_reddit_meme_pipeline.py:1138`),
