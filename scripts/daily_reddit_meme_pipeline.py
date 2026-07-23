@@ -2698,6 +2698,22 @@ def finalize_source_suitability_review(review: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def reject_non_image_source(post: reddit.RedditPost, source_path: str) -> dict[str, Any] | None:
+    """Build the source-gate rejection dict for posts with no usable image source.
+
+    Returns None when the post has an image media_type and a non-empty
+    source_path, meaning the caller should proceed to call
+    assess_source_suitability normally.
+    """
+    if post.media_type != "image" or not source_path:
+        return {
+            "approved": False,
+            "scores": {name: 0.0 for name in ("source_match", "visual_clarity", "motion_potential", "text_independence")},
+            "reason": f"no visual source available to write a scene (media_type={post.media_type!r}, downloaded={bool(source_path)})",
+        }
+    return None
+
+
 def assess_source_suitability(
     post: reddit.RedditPost,
     image_path: Path,
@@ -4608,12 +4624,9 @@ def main() -> int:
     else:
         for post in posts:
             source_path = source_media_paths.get(post.id, "")
-            if post.media_type != "image" or not source_path:
-                source_reviews[post.id] = {
-                    "approved": False,
-                    "scores": {name: 0.0 for name in ("source_match", "visual_clarity", "motion_potential", "text_independence")},
-                    "reason": "controlled I2V experiment requires a downloaded source image",
-                }
+            rejection = reject_non_image_source(post, source_path)
+            if rejection is not None:
+                source_reviews[post.id] = rejection
                 continue
             source_calls = generation_calls_by_post.setdefault(post.id, [])
             source_reviews[post.id] = assess_source_suitability(

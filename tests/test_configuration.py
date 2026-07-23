@@ -487,6 +487,44 @@ class SourceSuitabilityMotionCapTests(unittest.TestCase):
         self.assertEqual(payload["format"]["properties"]["open_scene_no_intrinsic_motion"]["type"], "boolean")
         self.assertIn("open_scene_no_intrinsic_motion", payload["format"]["required"])
 
+    def test_non_image_post_rejected_with_media_type_aware_reason(self) -> None:
+        post = reddit.RedditPost(
+            subreddit="test",
+            id="t3_textonly",
+            title="a text post",
+            author="someone",
+            url="https://example.com/textonly",
+            updated="2026-07-23T00:00:00Z",
+            summary="",
+            rank=1,
+            media_type="text",
+            media_url="",
+        )
+        rejection = pipeline.reject_non_image_source(post, "")
+        self.assertIsNotNone(rejection)
+        self.assertFalse(rejection["approved"])
+        self.assertIn("media_type='text'", rejection["reason"])
+        self.assertNotIn("I2V", rejection["reason"])
+        self.assertEqual(
+            rejection["scores"],
+            {name: 0.0 for name in ("source_match", "visual_clarity", "motion_potential", "text_independence")},
+        )
+
+    def test_image_post_with_source_path_returns_none(self) -> None:
+        post = reddit.RedditPost(
+            subreddit="test",
+            id="t3_hasimage",
+            title="an image post",
+            author="someone",
+            url="https://example.com/hasimage",
+            updated="2026-07-23T00:00:00Z",
+            summary="",
+            rank=1,
+            media_type="image",
+            media_url="https://example.com/hasimage.jpg",
+        )
+        self.assertIsNone(pipeline.reject_non_image_source(post, "/tmp/hasimage.jpg"))
+
 
 class SourceSuitabilityDriftRiskPassthroughTests(unittest.TestCase):
     def test_resting_domestic_animal_flag_passes_through_without_affecting_approval(self) -> None:
