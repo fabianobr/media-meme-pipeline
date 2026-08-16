@@ -41,6 +41,51 @@ Workflow ComfyUI confirmado por UUID (`3a1535df-9c7b-4181-8ae4-53ce711a8e7a`, ba
   é a referência confiável para este guia, não a versão reescrita pela LLM.
 - Negativo fixo: `"pc game, console game, video game, cartoon, childish, ugly"`.
 
+### Parâmetros técnicos completos do grafo
+
+Extraídos node a node via `/history` da API do ComfyUI (execução real, não o arquivo salvo
+na UI, que guarda outra representação). Referência para qualquer render futuro que reuse este
+grafo.
+
+**Componentes/modelos:**
+- Checkpoint: `ltx-2.3-22b-dev-fp8.safetensors`
+- LoRA distilled (aplicada só no model, via `LoraLoaderModelOnly`):
+  `ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors`,
+  `strength_model=0.5`
+- Text encoder (áudio+texto): `gemma_3_12B_it_fp4_mixed.safetensors` via `LTXAVTextEncoderLoader`
+- Upscaler latente: `ltx-2.3-spatial-upscaler-x2-1.1.safetensors` via `LTXVLatentUpsampler`
+- LoRA de prompt-enhancer (`gemma-3-12b-it-abliterated_lora_rank64_bf16`) presente no grafo mas
+  **não usada** neste guia — ver ressalva acima sobre corrupção de texto.
+
+**Amostragem (duas passadas, regime distilled):**
+- Passada base: `KSamplerSelect sampler_name=euler`, `ManualSigmas=[0.85, 0.725, 0.4219, 0.0]`
+  (3 steps efetivos), `CFGGuider cfg=1.0`, resolução de trabalho = metade da base final (ex.
+  180×360 quando a base é 360×720)
+- `LTXVLatentUpsampler`: upscale x2 do latente (ex. 180×360 → 360×720)
+- Passada de refino: `KSamplerSelect sampler_name=euler`, `ManualSigmas` de 9 valores
+  `[1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0]` (8 steps efetivos),
+  `CFGGuider cfg=1.0`
+- Decode: `VAEDecodeTiled` (`tile_size=768, overlap=64, temporal_size=4096,
+  temporal_overlap=4`). **A resolução final do MP4 não é a resolução "aspiracional" declarada
+  no bloco de Formato do prompt** (ex. texto diz 1080×1920, arquivo real sai em 320×704) — é
+  determinada pelos números de largura/altura base × 2 (upsample), não pelo texto do prompt.
+
+**Áudio nativo (não é TTS):**
+`LTXVEmptyLatentAudio` + `LTXVAudioVAELoader`/`LTXVAudioVAEDecode`, processado junto do vídeo
+no mesmo latente durante a amostragem (`LTXVConcatAVLatent` antes, `LTXVSeparateAVLatent`
+depois de cada passada) e só separado para decodificar cada stream. Diálogo/voz sai desse
+mesmo processo de geração, não é sobreposto depois.
+
+**Duração/fps:** fps fixo (usado 25 em todos os testes). `frames = fps × segundos + 1`
+(fórmula do grafo, dois `PrimitiveInt` + `ComfyMathExpression`). 25s → 626 frames renderizou
+limpo (ver ressalva de teto de duração já registrada acima).
+
+**Negativo:** o texto fixo listado acima está presente no grafo, mas é **inerte** —
+`CFGGuider cfg=1.0` desativa a orientação por classificador (sem guidance negativa), achado já
+documentado em `docs/experiments/2026-07-07-ltx23-official-template-i2v.md`. Não vale a pena
+customizar o negativo neste regime; a defesa contra deriva de cena/espécie deve vir só da
+descrição positiva concreta (ver blocos 2/3 abaixo).
+
 Roteiro original (verbatim, é o material que este guia decompõe em blocos):
 
 ```
@@ -201,6 +246,42 @@ parametrizado e testado com cenas de meme reais. Recomendo atualizar
 `docs/roadmap.md` com uma entrada curta registrando essa reabertura, para o guardrail
 antigo não ser tratado como ainda vigente por engano numa sessão futura.
 
+## Log de testes manuais (lab)
+
+Depois de escrito o guia acima, o usuário pediu para aplicar de fato numa cena de meme, no
+mesmo grafo estudado (via API do ComfyUI, script avulso fora do repo — mesmo padrão do
+laboratório manual já documentado em `docs/roadmap.md` item 20, nunca hand-rollando grafo
+novo, só reusando os nós reais de uma execução histórica desse workflow e trocando os inputs
+declarados). Personagem: Gerald, gato já testado no projeto (`docs/experiments/
+frozen-gerald-concept-seeds-v2.json`, candidato #3 — piada "chamei o gato de Gerald / agora
+ele senta desse jeito / e pede para falar com meu gerente").
+
+**Teste 1 — 9s, Receita B, cena única (sentado encarando a câmera).** Resultado: qualidade
+visual excelente (sujeito consistente, sem deriva de espécie/cena), mas cenário pobre — só um
+gato parado numa poltrona. Veredito do usuário: "ficou excelente, mas a cena e cenário estão
+muito pobres... pode colocar uma história para 25s".
+
+**Teste 2 — 25s, 3 atos (cozinha → balcão com correspondência → close falando pra câmera).**
+Resultado: ambiente rico, história com progressão real (andar até a tigela vazia, pular no
+balcão, bater na papelada, encarar a câmera), sujeito consistente nos 3 atos. `freezedetect`
+do ffmpeg acusou vários trechos "parados" no ato 1 — inspeção frame a frame mostrou que era
+falso positivo (o gato estava genuinamente andando); reforça o achado já registrado no
+roadmap de que esse detector não serve como veredito automático aqui. Veredito do usuário:
+história melhor, mas o andar do gato "ficou parecendo vídeo de IA" (descrição de passos vaga
+demais no prompt) — pediu troca do desfecho: em vez de falar direto pra câmera, o gato vai ao
+celular, abre um chat estilo WhatsApp com o contato "Gerente" e grava a reclamação como áudio.
+
+**Achado operacional (não é bug do template, é do host):** durante os dois primeiros testes o
+ComfyUI caiu duas vezes por falta de RAM do host (32GB total, caiu a ~0,6-2GB livre com
+múltiplos renders simultâneos — pelo menos um deles não iniciado por este teste, sugerindo uso
+concorrente do mesmo ComfyUI local). Sem correção de código possível aqui; mitigação usada:
+laço de espera que só enfileira quando a fila do ComfyUI está vazia e a RAM livre está acima
+de um piso seguro antes de cada render.
+
+**Teste 3 — em andamento:** gait do gato reescrito com detalhe cinestésico concreto (marcha
+diagonal alternada, quadril balançando, cauda contrabalançando, almofadinha tocando o chão) e
+novo desfecho com celular/WhatsApp/áudio de voz.
+
 ## Divergências / candidatos a investigação futura (fora de escopo hoje)
 
 - **Teto de duração.** O grafo oficial usado no vídeo estudado rodou 25s/626 frames limpo
@@ -223,11 +304,11 @@ antigo não ser tratado como ainda vigente por engano numa sessão futura.
 - Nenhuma parametrização em código (Jinja/f-string/função) — isso é o "depois" mencionado
   pelo usuário, uma etapa futura separada.
 
-## Próximos passos sugeridos (não executados nesta sessão)
+## Próximos passos
 
-1. Usuário revisa este documento.
+1. Fechar o teste do Gerald (ver "Log de testes manuais" acima) com veredito humano explícito
+   nos 3 eixos já usados no projeto (piada, voz, movimento).
 2. Atualizar `docs/roadmap.md` com uma entrada curta registrando a reabertura do guardrail
-   de lip-sync e o achado do teto de duração do grafo oficial.
-3. Numa sessão futura: escolher 2-3 cenas de meme reais, escrever os prompts manualmente
-   usando esta biblioteca de blocos (Receita A e/ou B), renderizar e obter veredito humano
-   — só depois disso considerar parametrizar em código.
+   de lip-sync, o achado do teto de duração do grafo oficial e o resultado do lab do Gerald.
+3. Só depois de 2-3 cenas de meme aprovadas manualmente com esta biblioteca de blocos,
+   considerar parametrizar em código (fora de escopo até lá).
