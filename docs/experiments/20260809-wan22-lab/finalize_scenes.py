@@ -133,14 +133,18 @@ def finish_scene(scene: dict) -> Path:
     extend = max(0.0, target - clip_seconds)
 
     out_path = workdir / f"{name}-final.mp4"
-    vf = f"[0:v]tpad=stop_mode=clone:stop_duration={extend:.3f}[base];[base][1:v]overlay=0:0:format=auto[vout]"
+    filter_complex = (
+        f"[0:v]tpad=stop_mode=clone:stop_duration={extend:.3f}[base];"
+        f"[base][1:v]overlay=0:0:format=auto[vout];"
+        f"[2:a:0]apad,atrim=0:{target:.3f},asetpts=PTS-STARTPTS[aout]"
+    )
     p.run_ffmpeg(
         [
             "-i", str(scene["clip"]),
             "-i", str(caption_png),
             "-i", str(narration_raw),
-            "-filter_complex", vf,
-            "-map", "[vout]", "-map", "2:a:0",
+            "-filter_complex", filter_complex,
+            "-map", "[vout]", "-map", "[aout]",
             "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-t", f"{target:.3f}",
