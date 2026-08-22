@@ -1,0 +1,14 @@
+{
+  "scene1": {
+    "image": "Photorealistic medium shot, vertical 9:16 frame. A fit young man lying on a flat gym bench, feet planted firmly on the floor, hands gripping a barbell slightly wider than shoulder-width, shoulder blades pulled back and pressed into the bench, focused expression, about to begin a bench press. Modern gym background softly blurred, soft cinematic lighting, shallow depth of field, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, close-up tracking shot on the shoulders and grip. The person settles his shoulder blades back against the bench, adjusts his grip slightly on the bar, takes a steady breath before lifting, subtle natural motion, stable camera, cinematic lighting."
+  },
+  "scene2": {
+    "image": "Photorealistic medium shot, vertical 9:16 frame, side angle. A fit young man performing a bench press, lowering a barbell in a controlled motion until it nearly touches his chest, elbows bent at roughly a 45-degree angle relative to his torso, muscles engaged, modern gym background softly blurred, soft cinematic lighting, shallow depth of field, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, medium side-angle tracking shot. The barbell lowers smoothly and under control until it nearly touches the chest, elbows staying at a moderate angle, then the person presses the bar back up to full extension with steady controlled motion, stable camera, cinematic lighting."
+  },
+  "scene3": {
+    "image": "Photorealistic medium shot, vertical 9:16 frame. A fit young man performing a bench press with a spotter standing behind the bench, hands hovering just under the barbell ready to assist, attentive expression, modern gym background softly blurred, soft cinematic lighting, shallow depth of field, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, medium dolly-in shot. The spotter keeps his hands close under the bar without touching it, subtle attentive body language, the lifter presses the bar up with steady controlled motion, stable camera, cinematic lighting, safety-focused mood."
+  }
+}

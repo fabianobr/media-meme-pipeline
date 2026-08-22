@@ -1,0 +1,20 @@
+{
+  "_meta_lab": "Lab 2026-08-09 — Wan 2.2 I2V A14B GGUF Q5_K_M + Lightning Seko-V1 (4 steps: 2 high-noise + 2 low-noise, cfg 1.0, shift 5.0, euler/simple, 16 fps). Estrutura espelha o template oficial video_wan2_2_14B_i2v com loaders trocados para GGUF. Parametrizar: prompt (8), seed (13), width/height/length (12), image (11), filename_prefix (17).",
+  "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "Wan2.2-I2V-A14B-HighNoise-Q5_K_M.gguf"}},
+  "2": {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": "wan2.2_i2v_lightning_4steps_high_noise_seko_v1.safetensors", "strength_model": 1.0, "model": ["1", 0]}},
+  "3": {"class_type": "ModelSamplingSD3", "inputs": {"shift": 5.0, "model": ["2", 0]}},
+  "4": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "Wan2.2-I2V-A14B-LowNoise-Q5_K_M.gguf"}},
+  "5": {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": "wan2.2_i2v_lightning_4steps_low_noise_seko_v1.safetensors", "strength_model": 1.0, "model": ["4", 0]}},
+  "6": {"class_type": "ModelSamplingSD3", "inputs": {"shift": 5.0, "model": ["5", 0]}},
+  "7": {"class_type": "CLIPLoader", "inputs": {"clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan"}},
+  "8": {"class_type": "CLIPTextEncode", "inputs": {"text": "PLACEHOLDER_POSITIVE_PROMPT", "clip": ["7", 0]}},
+  "9": {"class_type": "CLIPTextEncode", "inputs": {"text": "static image, no motion, blurry, distorted, low quality, watermark, text overlay", "clip": ["7", 0]}},
+  "10": {"class_type": "VAELoader", "inputs": {"vae_name": "wan_2.1_vae.safetensors"}},
+  "11": {"class_type": "LoadImage", "inputs": {"image": "PLACEHOLDER_INPUT_IMAGE.png"}},
+  "12": {"class_type": "WanImageToVideo", "inputs": {"width": 480, "height": 832, "length": 81, "batch_size": 1, "positive": ["8", 0], "negative": ["9", 0], "vae": ["10", 0], "start_image": ["11", 0]}},
+  "13": {"class_type": "KSamplerAdvanced", "inputs": {"add_noise": "enable", "noise_seed": 42, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "start_at_step": 0, "end_at_step": 2, "return_with_leftover_noise": "enable", "model": ["3", 0], "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["12", 2]}},
+  "14": {"class_type": "KSamplerAdvanced", "inputs": {"add_noise": "disable", "noise_seed": 0, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "start_at_step": 2, "end_at_step": 10000, "return_with_leftover_noise": "disable", "model": ["6", 0], "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["13", 0]}},
+  "15": {"class_type": "VAEDecode", "inputs": {"samples": ["14", 0], "vae": ["10", 0]}},
+  "16": {"class_type": "CreateVideo", "inputs": {"images": ["15", 0], "fps": 16}},
+  "17": {"class_type": "SaveVideo", "inputs": {"video": ["16", 0], "filename_prefix": "wan22-lab/output", "format": "mp4", "codec": "h264"}}
+}

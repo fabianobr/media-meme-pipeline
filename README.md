@@ -8,15 +8,23 @@ Este repositório é preparado para ser público. Ele não deve conter tokens, o
 
 Marco alcançado:
 
-- vídeo em qualidade aceitável para revisão;
-- texto/meme melhorado com crítica de humor;
-- áudio PT-BR entendível;
-- prompts LTX compilados como descrições cinematográficas literais.
+- contratos de conceito, crítica e artefatos endurecidos contra aprovação fabricada;
+- curadoria progressiva de `r/popular` com backlog e checkpoints;
+- crítico de humor com visão real (`qwen2.5vl:7b`) e revisão humana de texto antes de render;
+- render ComfyUI/LTX com TTS Piper local e auditoria de geração;
+- default atual do código: T2V (`--ltx23-input-mode prompt`) + TTS (`--ltx23-audio-mode tts`).
+
+O estado operacional mais recente está em
+[`docs/roadmap.md`](docs/roadmap.md) e
+[`docs/experiments/2026-08-22-operational-handoff.md`](docs/experiments/2026-08-22-operational-handoff.md).
+O default T2V está portado, mas ainda precisa de um baseline humano maior antes de ser tratado
+como qualidade consolidada para todos os arquétipos.
 
 Backlog futuro, fora do escopo atual:
 
 - música de fundo cômica;
 - entonação de voz mais cômica.
+- parametrizar roteiros T2V ricos a partir da spec de prompt de 2026-08-16.
 
 ## Plataforma Suportada
 
@@ -110,7 +118,10 @@ data/
   media-pipeline/        # local e ignorado pelo Git
 ```
 
-O caminho padrão LTX 2.3 gera áudio e vídeo nativamente no ComfyUI. `ffprobe` valida o MP4; `ffmpeg` permanece disponível apenas para diagnóstico e modos legados de revisão:
+O caminho LTX 2.3 chama o ComfyUI diretamente. O default atual do código gera vídeo T2V a
+partir de prompt cinematográfico literal e muxa narração Piper medida; I2V da foto real
+continua disponível como alternativa/baseline. `ffprobe` valida o MP4; `ffmpeg` permanece
+disponível para diagnóstico, mux e modos legados de revisão:
 
 ```bash
 docker build -f infra/Dockerfile.runtime -t media-meme-pipeline:local .
@@ -144,8 +155,9 @@ o backlog fechar:
 python3 scripts/reddit_popular_curation.py --target 20
 ```
 
-Posts de vídeo e texto são pulados, não avaliados: o motor de render é I2V (imagem→vídeo), sem
-caminho hoje para gerar vídeo-meme a partir de vídeo ou texto-fonte. O backlog fica em
+Posts de vídeo e texto são pulados, não avaliados: mesmo com T2V como default de render, o
+funil atual ainda precisa de uma cena visual concreta baixada/descritível para escrever o
+prompt cinematográfico e avaliar potencial de movimento. O backlog fica em
 `data/media-pipeline/popular-curated-backlog.json` (gitignored); cada entrada aprovada
 carrega o post, o caminho da mídia baixada, a descrição visual e a revisão do gate de fonte,
 prontos para alimentar `--concepts-file`/`--approved-concepts-file` do pipeline principal.
@@ -194,7 +206,11 @@ Credenciais do Hermes/Telegram permanecem em `~/.hermes/.env`. O pipeline só en
 
 ## Render de Vídeo LTX 2.3
 
-O caminho principal é I2V nativo no ComfyUI: o pipeline gera uma imagem-base limpa, usa essa imagem como referência para o LTX 2.3 e mantém áudio/vídeo no mesmo grafo. O grafo I2V segue o template oficial do ComfyUI (`video_ltx2_3_i2v`): passe base em meia resolução com schedule distilled de 8 steps e CFG 1.0, upscale latente espacial ×2 e refine de 3 steps. O preset inicial é curto para validação: 1280×720 finais e 49 frames.
+O caminho default atual é T2V no ComfyUI: o pipeline compila um prompt cinematográfico
+literal, renderiza vídeo sem fala nativa e muxa uma narração Piper medida. I2V continua
+disponível com `--ltx23-input-mode source` (foto real baixada) ou `image` (imagem-base
+gerada), usando o grafo oficial `video_ltx2_3_i2v` convertido para API em
+`workflows/05-ltx23-official-i2v-audio-api.json`.
 
 ```bash
 python3 scripts/daily_reddit_meme_pipeline.py \
@@ -204,7 +220,10 @@ python3 scripts/daily_reddit_meme_pipeline.py \
   --max-age-hours 48 \
   --make-video \
   --video-engine ltx23 \
-  --ltx23-input-mode image \
+  --ltx23-input-mode prompt \
+  --ltx23-audio-mode tts \
+  --ltx23-width 768 \
+  --ltx23-height 448 \
   --only-index 1 \
   --output-root data/media-pipeline/reddit-ltx-test \
   --run-tag ltx-test \
@@ -223,24 +242,35 @@ post + descrição da imagem
   -> roteiro semântico do vídeo
   -> compilador de prompt cinematográfico literal
   -> workflow ComfyUI LTX 2.3 nativo
-  -> vídeo e áudio gerados no mesmo grafo
+  -> vídeo renderizado
+  -> narração TTS local medida e muxada
   -> validação local do MP4
 ```
 
-Os grafos em `workflows/03-ltx23-native-t2v-audio-api.json` e `workflows/05-ltx23-official-i2v-audio-api.json` são as fontes de verdade. O grafo `04` (I2V construído à mão) foi aposentado após reprovar no gate visual com pseudo-texto e drift; a causa raiz foi o regime de guidance/schedule incompatível com o LoRA distilled, não o prompt. O Python apenas parametriza entradas declaradas, enfileira em `/prompt`, consulta `/history`, baixa e valida o resultado. O modo default para `ltx23` é `--ltx23-input-mode image`; `prompt` fica como baseline técnico T2V.
+Os grafos em `workflows/03-ltx23-native-t2v-audio-api.json` e
+`workflows/05-ltx23-official-i2v-audio-api.json` são as fontes de verdade. O grafo `04`
+(I2V construído à mão) foi aposentado após reprovar no gate visual com pseudo-texto e drift;
+a causa raiz foi o regime de guidance/schedule incompatível com o LoRA distilled, não o
+prompt. O Python apenas parametriza entradas declaradas, enfileira em `/prompt`, consulta
+`/history`, baixa e valida o resultado. O modo default atual para `ltx23` é
+`--ltx23-input-mode prompt`; `source` e `image` são caminhos I2V alternativos.
 
-O smoke test técnico do T2V nativo executou sem OOM, mas foi reprovado visualmente por pseudo-texto e marcas de interface. Consulte `docs/experiments/2026-06-28-ltx23-native-av.md`. Não escale T2V para produção sem novo gate visual; o próximo experimento deve validar I2V com imagem-base limpa.
-
-O smoke I2V de 29 de junho passou no gate técnico e preservou a composição sem pseudo-texto nos frames inspecionados. Consulte `docs/experiments/2026-06-29-ltx23-native-i2v.md`. O próximo gate é um conceito real congelado com 49 frames e avaliação humana.
+Histórico: o smoke T2V de 2026-06-28 executou sem OOM, mas falhou visualmente com pseudo-texto
+e marcas de interface; o smoke I2V de 2026-06-29 preservou composição no gate técnico. Depois
+disso, o pipeline migrou para T2V+TTS com prompt cinematográfico literal, mas o baseline
+humano ainda não cobre todos os arquétipos. Consulte `docs/roadmap.md` itens 20-21 e
+`docs/superpowers/specs/2026-08-16-t2v-quality-prompt-template-design.md` antes de tratar
+T2V como qualidade consolidada.
 
 ### Duração, memória e pausas de áudio
 
-Há dois tetos de memória distintos numa GPU de 16 GB/host de 29 GB de RAM: o teto de VRAM
-afeta o passe de refine em resolução alta (~5s em 1024×576 ou ~8s em 768×448 numa tacada só);
-um teto separado de RAM do host derruba o processo do ComfyUI silenciosamente (sem traceback)
-perto de ~10s numa tacada só. Para vídeos além de ~8s, use `--ltx23-segments 2`: o grafo
-renderiza dois segmentos, o segundo ancorado no último frame extraído do primeiro, e os MP4s
-são concatenados sem recodificar.
+Há dois tetos de memória distintos numa GPU de 16 GB/host de ~32 GB de RAM: o teto de VRAM
+afeta o passe de refine em resolução alta, e um teto separado de RAM do host pode derrubar o
+processo do ComfyUI silenciosamente. Em I2V, vídeos além de ~8s podem usar
+`--ltx23-segments 2`: o grafo renderiza dois segmentos, o segundo ancorado no último frame
+extraído do primeiro, e os MP4s são concatenados sem recodificar. Em T2V+TTS, o pipeline
+limita o render a 353 frames / ~14,12s (`LTX23_T2V_TTS_MAX_FRAMES`) até o grafo longo ser
+validado formalmente.
 
 O áudio nativo do LTX preenche a duração inteira com a fala — não existe uma forma confiável
 de pedir uma pausa por instrução no prompt (testado e medido: pausa por texto não muda o

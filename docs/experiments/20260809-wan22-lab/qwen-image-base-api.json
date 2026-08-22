@@ -1,0 +1,9 @@
+{
+  "_meta_lab": "Lab base-image gen. Switched to Flux1-schnell-fp8 all-in-one checkpoint (CheckpointLoaderSimple) after finding qwen_image_vae.safetensors is a broken symlink on this host (pre-existing, unrelated to this lab -> /mnt/models/comfyui/vae/ not mounted). Parametrize: prompt (3), seed (6), width/height (5), filename_prefix (8).",
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "flux1-schnell-fp8.safetensors"}},
+  "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "PLACEHOLDER_PROMPT", "clip": ["1", 1]}},
+  "5": {"class_type": "EmptySD3LatentImage", "inputs": {"width": 480, "height": 832, "batch_size": 1}},
+  "6": {"class_type": "KSampler", "inputs": {"seed": 0, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0, "model": ["1", 0], "positive": ["3", 0], "negative": ["3", 0], "latent_image": ["5", 0]}},
+  "7": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}},
+  "8": {"class_type": "SaveImage", "inputs": {"filename_prefix": "wan22-lab/base", "images": ["7", 0]}}
+}
