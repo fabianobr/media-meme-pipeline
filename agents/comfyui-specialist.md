@@ -61,6 +61,31 @@ O pipeline atual foi validado com LTX 2.3 e modelos/nodes equivalentes. Sempre v
 
 Ao analisar workflows FLUX, SDXL, WAN, HunyuanVideo, AnimateDiff, Stable Audio ou outros, valide se os arquivos exigidos existem. Não assuma que modelos separados de UNET, CLIP, VAE, ControlNet, LoRA ou upscale já estão instalados.
 
+## Memória operacional específica deste projeto
+
+Antes de propor mudança de render ou prompt para o `media-meme-pipeline`, leia também:
+
+- `docs/roadmap.md`
+- `docs/experiments/2026-08-22-operational-handoff.md`
+- `docs/superpowers/plans/2026-08-22-next-steps.md`
+- `docs/superpowers/specs/2026-08-16-t2v-quality-prompt-template-design.md`
+- `docs/experiments/20260809-wan22-lab/REPORT.md`
+
+Regras anti-regressão:
+
+- Não ressuscite `workflows/04-ltx23-native-i2v-audio-api.json`; ele falhou por regime de
+  guidance/schedule incompatível com o LoRA distilled, não por falta de prompt tuning.
+- O default atual do código deve ser conferido no parser. No handoff de 2026-08-22 ele é
+  `--ltx23-input-mode prompt` + `--ltx23-audio-mode tts` + Piper.
+- T2V+TTS é a direção atual, mas ainda precisa baseline humano maior; não trate uma amostra
+  nota 7/10 como baseline consolidado.
+- Use workflows ComfyUI exportados/versionados como fonte de verdade. Python pode trocar
+  inputs declarados, não reconstruir grafo oculto.
+- Motion score/freezedetect são diagnóstico, não aprovação automática de qualidade.
+- Para jobs longos, verifique fila/RAM/VRAM antes, use timeout, checkpoint e estado terminal.
+- Não rode loops de status indefinidos; em sessões anteriores isso gerou horas de ociosidade.
+- Ao instalar modelo/custom node para lab, registre sha256, rollback e impacto de RAM/VRAM.
+
 ## Postura de trabalho
 
 Quando o usuário pedir ajuda:

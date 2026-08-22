@@ -1,0 +1,14 @@
+{
+  "scene1": {
+    "image": "Photorealistic gym photograph, vertical 9:16 frame, camera positioned at bench height about 2 meters from the subject. A fit young man lies supine (face up) on a flat weight bench: upper back and shoulders pressed flat against the bench pad, head resting on the pad, hips staying on the bench, knees bent with both feet flat on the floor. His hands grip a barbell directly above his chest, slightly wider than shoulder-width, arms not yet extended, about to begin the lift. Modern gym background softly blurred, soft natural lighting, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, static camera at bench height, no camera movement. The person adjusts his grip slightly and settles his shoulder blades into the bench, subtle steady breathing motion, stable frame, cinematic lighting."
+  },
+  "scene2": {
+    "image": "Photorealistic gym photograph, vertical 9:16 frame, camera positioned at bench height about 2 meters from the subject. A fit young man lies supine (face up) on a flat weight bench: upper back and shoulders pressed flat against the bench pad, head resting on the pad, hips staying on the bench, knees bent with both feet flat on the floor. He is holding a barbell with elbows bent at roughly a 45-degree angle to his torso, the bar lowered until it nearly touches his mid-chest. Modern gym background softly blurred, soft natural lighting, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, static camera at bench height, no camera movement. The barbell presses upward smoothly from the chest to full arm extension in a controlled motion, then lowers back down, steady rhythmic movement, stable frame, cinematic lighting."
+  },
+  "scene3": {
+    "image": "Photorealistic gym photograph, vertical 9:16 frame, camera positioned at bench height about 2 meters from the subject. A fit young man lies supine (face up) on a flat weight bench: upper back and shoulders pressed flat against the bench pad, head resting on the pad, hips staying on the bench, knees bent with both feet flat on the floor, arms extended holding a barbell above his chest. A second person, the spotter, stands behind the head of the bench, both hands hovering just below the barbell without touching it, attentive posture. Modern gym background softly blurred, soft natural lighting, high detail, no text, no watermark.",
+    "motion": "Vertical 9:16 video, static camera at bench height, no camera movement. The spotter keeps his hands steady just under the bar, subtle attentive body language, the lifter's arms move the bar down and up in a slow controlled repetition, stable frame, cinematic lighting."
+  }
+}

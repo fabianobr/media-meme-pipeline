@@ -1,0 +1,14 @@
+{
+  "scene1": {
+    "image": "Photorealistic vertical 9:16 shot of a gym beginner lying on a flat weight bench, feet planted firmly on the floor, hands gripping a barbell in a wide shoulder-width grip. The person's shoulder blades are retracted and pressed into the leather upholstery. Cinematic soft lighting, clean modern gym background with blurred equipment, shallow depth of field, 8k resolution, high detail.",
+    "motion": "A slow dolly-in towards the athlete's face and upper body, focusing on the stability of the grip and the setup pose, subtle breathing movements in the chest, cinematic steadycam shot."
+  },
+  "scene2": {
+    "image": "Photorealistic vertical 9:16 medium shot of a person performing a barbell bench press. The bar is at the lowest point of the descent, hovering just above the mid-chest, with elbows tucked at a 45-degree angle to the torso. High detail on skin texture and muscle tension, modern gym setting, soft cinematic lighting, shallow depth of field.",
+    "motion": "A smooth tracking shot following the bar's path as it is lowered slowly and controlled, then pressed forcefully back up to full arm extension, capturing the mechanical movement of the press with high precision."
+  },
+  "scene3": {
+    "image": "Photorealistic vertical 9:16 wide shot of a person lying on a flat bench pressing a barbell, with a focused spotter standing behind the head of the bench. The spotter's hands are hovering just inches below the barbell, ready to assist. Clean modern gym interior, cinematic lighting, shallow depth of field, professional athletic wear.",
+    "motion": "A slow panning shot from the side, moving from the athlete to the spotter's attentive posture and hand placement, maintaining a steady gaze on the bar as it moves up and down one repetition."
+  }
+}
