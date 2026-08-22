@@ -1,10 +1,12 @@
 #!/bin/bash
 # Lab: render the 3 "recuperação muscular" scenes with both Wan 2.2 and LTX 2.3,
 # same base images/prompts, sequential to avoid GPU contention (16GB VRAM shared).
-set -u
+set -euo pipefail
 cd "$(dirname "$0")"
-BASE=/home/fabiano/code/media-meme-pipeline/data/media-pipeline/20260809-1958-wan22-lab/scenes
-LOG=/home/fabiano/code/media-meme-pipeline/docs/experiments/20260809-wan22-lab/scenes.log
+ROOT=$(cd ../../.. && pwd)
+BASE="$ROOT/data/media-pipeline/20260809-1958-wan22-lab/scenes"
+LOG="$BASE/logs/scenes.log"
+mkdir -p "$(dirname "$LOG")"
 : > "$LOG"
 
 declare -a NAMES=(scene1-microtears scene2-repair scene3-result)

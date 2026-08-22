@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path("/home/fabiano/code/media-meme-pipeline")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import daily_reddit_meme_pipeline as p  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402

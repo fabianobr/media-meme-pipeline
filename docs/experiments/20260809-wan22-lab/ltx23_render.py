@@ -11,7 +11,7 @@ second hand-built graph. Uso:
 import argparse, json, mimetypes, os, subprocess, sys, threading, time, urllib.parse, urllib.request, uuid
 
 COMFY = os.environ.get("COMFYUI_URL", "http://localhost:8188")
-PROJECT_ROOT = "/home/fabiano/code/media-meme-pipeline"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 WF = os.path.join(PROJECT_ROOT, "workflows", "05-ltx23-official-i2v-audio-api.json")
 
 DEFAULT_LTX23_CKPT_NAME = "ltx-2.3-22b-dev-fp8.safetensors"

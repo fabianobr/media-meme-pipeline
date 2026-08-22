@@ -1,10 +1,12 @@
 #!/bin/bash
 # Lab: render the user's own 3 scene prompts via Wan 2.2 (as requested), sequential
 # to avoid GPU/RAM contention.
-set -u
+set -euo pipefail
 cd "$(dirname "$0")"
-BASE=/home/fabiano/code/media-meme-pipeline/data/media-pipeline/20260809-1958-wan22-lab/scenes
-LOG=/home/fabiano/code/media-meme-pipeline/docs/experiments/20260809-wan22-lab/user-scenes-wan.log
+ROOT=$(cd ../../.. && pwd)
+BASE="$ROOT/data/media-pipeline/20260809-1958-wan22-lab/scenes"
+LOG="$BASE/logs/user-scenes-wan.log"
+mkdir -p "$(dirname "$LOG")"
 : > "$LOG"
 
 NEGATIVE="morphing, warping, distortion, face deformation, flickering, jittering, sudden changes, blurry, low quality, bad anatomy, text, watermark"

@@ -6,7 +6,8 @@ crossfade used for the infographic reel.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "/home/fabiano/code/media-meme-pipeline/scripts")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import finalize_scenes as fs  # noqa: E402
 import finalize_infographic_reel as fi  # noqa: E402
 

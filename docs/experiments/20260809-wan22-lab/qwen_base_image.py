@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Lab driver: generate one base image via Qwen-Image + Lightning LoRA (local,
-already-installed models). Uso: qwen_base_image.py --prompt "..." --out img.png
-[--width 480 --height 832 --seed 1]"""
+"""Lab driver: generate one base image via the checked lab workflow.
+
+Despite the historical filename, the workflow currently uses the local
+flux1-schnell-fp8 checkpoint because the Qwen-Image VAE symlink was broken on
+this host during the lab. Uso:
+
+  qwen_base_image.py --prompt "..." --out img.png [--width 480 --height 832 --seed 1]
+"""
 import argparse, json, os, sys, time, urllib.parse, urllib.request
 
 COMFY = os.environ.get("COMFYUI_URL", "http://localhost:8188")

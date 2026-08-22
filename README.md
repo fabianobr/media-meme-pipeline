@@ -155,8 +155,9 @@ o backlog fechar:
 python3 scripts/reddit_popular_curation.py --target 20
 ```
 
-Posts de vídeo e texto são pulados, não avaliados: o motor de render é I2V (imagem→vídeo), sem
-caminho hoje para gerar vídeo-meme a partir de vídeo ou texto-fonte. O backlog fica em
+Posts de vídeo e texto são pulados, não avaliados: mesmo com T2V como default de render, o
+funil atual ainda precisa de uma cena visual concreta baixada/descritível para escrever o
+prompt cinematográfico e avaliar potencial de movimento. O backlog fica em
 `data/media-pipeline/popular-curated-backlog.json` (gitignored); cada entrada aprovada
 carrega o post, o caminho da mídia baixada, a descrição visual e a revisão do gate de fonte,
 prontos para alimentar `--concepts-file`/`--approved-concepts-file` do pipeline principal.
@@ -254,9 +255,12 @@ prompt. O Python apenas parametriza entradas declaradas, enfileira em `/prompt`,
 `/history`, baixa e valida o resultado. O modo default atual para `ltx23` é
 `--ltx23-input-mode prompt`; `source` e `image` são caminhos I2V alternativos.
 
-O smoke test técnico do T2V nativo executou sem OOM, mas foi reprovado visualmente por pseudo-texto e marcas de interface. Consulte `docs/experiments/2026-06-28-ltx23-native-av.md`. Não escale T2V para produção sem novo gate visual; o próximo experimento deve validar I2V com imagem-base limpa.
-
-O smoke I2V de 29 de junho passou no gate técnico e preservou a composição sem pseudo-texto nos frames inspecionados. Consulte `docs/experiments/2026-06-29-ltx23-native-i2v.md`. O próximo gate é um conceito real congelado com 49 frames e avaliação humana.
+Histórico: o smoke T2V de 2026-06-28 executou sem OOM, mas falhou visualmente com pseudo-texto
+e marcas de interface; o smoke I2V de 2026-06-29 preservou composição no gate técnico. Depois
+disso, o pipeline migrou para T2V+TTS com prompt cinematográfico literal, mas o baseline
+humano ainda não cobre todos os arquétipos. Consulte `docs/roadmap.md` itens 20-21 e
+`docs/superpowers/specs/2026-08-16-t2v-quality-prompt-template-design.md` antes de tratar
+T2V como qualidade consolidada.
 
 ### Duração, memória e pausas de áudio
 

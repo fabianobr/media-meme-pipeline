@@ -1,10 +1,12 @@
 #!/bin/bash
 # Lab: render the 3 infographic-style scenes (flat vector, consistent palette) via LTX 2.3
 # I2V, sequential to avoid GPU contention.
-set -u
+set -euo pipefail
 cd "$(dirname "$0")"
-BASE=/home/fabiano/code/media-meme-pipeline/data/media-pipeline/20260809-1958-wan22-lab/scenes
-LOG=/home/fabiano/code/media-meme-pipeline/docs/experiments/20260809-wan22-lab/infographic.log
+ROOT=$(cd ../../.. && pwd)
+BASE="$ROOT/data/media-pipeline/20260809-1958-wan22-lab/scenes"
+LOG="$BASE/logs/infographic.log"
+mkdir -p "$(dirname "$LOG")"
 : > "$LOG"
 
 declare -a NAMES=(infog-scene1 infog-scene2d infog-scene3b)
