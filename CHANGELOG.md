@@ -7,6 +7,36 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
 
 ## [Unreleased]
 
+### Fixed
+- Workflow `07` agora descarrega o Ollama antes de carregar o encoder Qwen e força o unload
+  dos modelos Qwen/CLIP/VAE antes de iniciar o Wan S2V por meio do node local
+  `ComfyUnloadModels`; `WanSoundImageToVideo.batch_size` foi corrigido
+  de 3 para 1. O campo batch cria vídeos simultâneos e não representa a quantidade de blocos
+  temporais — valores 3/6 estouravam os 16 GB de VRAM. A espera do flush do Ollama é 120 s,
+  pois 15 s não bastaram para descarregar o `qwen2.5-coder:32b` de 24 GB.
+- O diagnóstico do primeiro MP4 bem-sucedido separou as falhas de áudio e vídeo: o FLAC do
+  Kokoro e a faixa AAC final tinham a mesma duração e as mesmas pausas, confirmando que o
+  timbre robotizado vinha da voz `pf_dora`, não da muxagem; o vídeo tinha 12 s para 10,603 s
+  de fala. O workflow `08` troca o TTS por `pt-BR-ThalitaMultilingualNeural` e corta os
+  frames automaticamente na duração do áudio, impedindo movimento de boca após a fala.
+
+### Added
+- Custom node reproduzível `infra/comfyui-custom-nodes/ComfyUI-ComfyUnloadModels`, um
+  passthrough de imagem que executa `unload_all_models()` e limpa o cache CUDA entre etapas
+  pesadas do mesmo grafo.
+- Workflow frontend `08-qwen2512-edge-tts-wan22-s2v-ptbr-frontend.json` e custom node
+  `ComfyUI-EdgeTTS-PTBR`. O TTS usa o serviço on-line Edge sem alocar VRAM; a extensão
+  também inclui `TrimImageSequenceToAudio`. Um smoke test real no ComfyUI gerou FLAC com
+  sucesso. O Wan 2.2 S2V continua oferecendo lip-sync aproximado; sincronização fonética
+  precisa exige um estágio dedicado de lip-sync.
+- Workflow mestre `09-qwen2512-edge-tts-wan22-s2v-duration-presets-frontend.json`, sem
+  substituir o workflow `08`, com um único seletor para 8, 12 ou 25 segundos e resolução
+  vertical centralizada no primeiro box. A cadeia compartilhada usa 2, 3 ou 6 blocos Wan,
+  respectivamente. Os novos nodes `DurationPresetControl`, `VideoResolutionControl` e
+  `DurationPresetLatentSwitch` usam avaliação lazy, portanto extensões posteriores ao preset
+  escolhido não são executadas. O contrato lazy foi validado no ComfyUI com latentes vazios:
+  o preset de 8 s selecionou somente o latent 64×64 da primeira ramificação.
+
 ### Changed
 - Defaults do render LTX 2.3 trocados para a receita validada pelo usuário (2026-07-21):
   `--ltx23-input-mode prompt` (T2V a partir de descrição de cena literal, sem imagem de
