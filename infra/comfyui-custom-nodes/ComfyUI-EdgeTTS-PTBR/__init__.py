@@ -140,7 +140,7 @@ class EdgeTTSBrazilianPortuguese:
 
 
 class TrimImageSequenceToAudio:
-    """Trim a frame sequence so the video does not continue after speech ends."""
+    """Fit frames to the speech or to a selected fixed duration."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -153,25 +153,56 @@ class TrimImageSequenceToAudio:
                     "INT",
                     {"default": 2, "min": 0, "max": 30, "step": 1},
                 ),
-            }
+            },
+            "optional": {
+                "target_frames": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": 4096, "step": 1},
+                ),
+            },
         }
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("images",)
     FUNCTION = "trim"
     CATEGORY = "image/video"
-    DESCRIPTION = "Corta os frames excedentes usando a duração exata do AUDIO."
+    DESCRIPTION = (
+        "Corta à fala no modo compatível; com target_frames, preserva a duração "
+        "selecionada preenchendo o silêncio com o último frame."
+    )
 
-    def trim(self, images, audio, fps, end_padding_frames):
+    def trim(self, images, audio, fps, end_padding_frames, target_frames=None):
         waveform = audio["waveform"]
         sample_rate = int(audio["sample_rate"])
         if sample_rate <= 0 or waveform.shape[-1] <= 0:
             raise ValueError("O áudio precisa conter amostras e sample_rate válido.")
 
         duration_seconds = waveform.shape[-1] / sample_rate
-        wanted_frames = round(duration_seconds * fps) + end_padding_frames
-        wanted_frames = max(1, min(int(images.shape[0]), wanted_frames))
-        return (images[:wanted_frames],)
+        speech_frames = max(1, round(duration_seconds * fps) + end_padding_frames)
+
+        if target_frames is None or int(target_frames) <= 0:
+            wanted_frames = min(int(images.shape[0]), speech_frames)
+            return (images[: max(1, wanted_frames)],)
+
+        target_frames = int(target_frames)
+        if speech_frames > target_frames:
+            raise ValueError(
+                f"A fala ocupa aproximadamente {duration_seconds:.2f} s, acima do "
+                f"preset de {target_frames / fps:.2f} s. Escolha uma duração maior "
+                "ou reduza o texto/velocidade da voz."
+            )
+
+        source_frames = max(1, min(int(images.shape[0]), speech_frames))
+        source = images[:source_frames]
+        if source_frames >= target_frames:
+            return (source[:target_frames],)
+
+        import torch
+
+        padding = images[source_frames - 1 : source_frames].repeat(
+            (target_frames - source_frames,) + (1,) * (len(images.shape) - 1)
+        )
+        return (torch.cat((source, padding), dim=0),)
 
 
 class DurationPresetControl:

@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
 
 
@@ -84,10 +86,12 @@ def test_workflow_has_one_lazy_chain_for_three_duration_presets():
     assert links[560][1:5] == [268, 0, 265, 3]
 
     assert links[563][1:5] == [265, 1, 96, 2]
+    assert links[566][1:5] == [265, 1, 191, 4]
     assert links[564][1:5] == [270, 0, 93, 7]
     assert links[565][1:5] == [270, 1, 93, 8]
     assert nodes[93]["widgets_values"][3] == 1
     assert nodes[189]["type"] == "ComfyUnloadModels"
+    assert nodes[191]["inputs"][4]["link"] == 566
 
 
 def test_most_changed_inputs_are_first_and_inside_the_first_box():
@@ -159,3 +163,58 @@ def test_visual_layout_has_no_overlaps_and_every_node_is_grouped():
                 and ly + lh > ry
             )
             assert not overlaps, f"nodes {left['id']} and {right['id']} overlap"
+
+
+def test_fixed_duration_fills_silence_and_rejects_overlong_speech():
+    module = load_node_module()
+
+    class FakeTensor:
+        def __init__(self, shape):
+            self.shape = shape
+
+        def __getitem__(self, item):
+            if isinstance(item, slice):
+                start, stop, step = item.indices(self.shape[0])
+                length = len(range(start, stop, step))
+            else:
+                length = 1
+            return FakeTensor((length, *self.shape[1:]))
+
+        def repeat(self, repeats):
+            return FakeTensor((repeats[0], *self.shape[1:]))
+
+    fake_torch = types.SimpleNamespace(
+        cat=lambda tensors, dim=0: FakeTensor(
+            (sum(tensor.shape[0] for tensor in tensors), *tensors[0].shape[1:])
+        )
+    )
+    previous_torch = sys.modules.get("torch")
+    sys.modules["torch"] = fake_torch
+    try:
+        images = FakeTensor((481, 640, 368, 3))
+        short_audio = {
+            "waveform": FakeTensor((1, 1, 176_000)),
+            "sample_rate": 16_000,
+        }
+        (fitted,) = module.TrimImageSequenceToAudio().trim(
+            images, short_audio, fps=16.0, end_padding_frames=2, target_frames=400
+        )
+        assert fitted.shape[0] == 400
+
+        long_audio = {
+            "waveform": FakeTensor((1, 1, 416_000)),
+            "sample_rate": 16_000,
+        }
+        try:
+            module.TrimImageSequenceToAudio().trim(
+                images, long_audio, fps=16.0, end_padding_frames=2, target_frames=400
+            )
+        except ValueError as exc:
+            assert "acima do preset" in str(exc)
+        else:
+            raise AssertionError("fala acima do preset deveria interromper o workflow")
+    finally:
+        if previous_torch is None:
+            del sys.modules["torch"]
+        else:
+            sys.modules["torch"] = previous_torch

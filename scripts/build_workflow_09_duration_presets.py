@@ -56,7 +56,7 @@ def duration_control_node():
         ],
         "properties": {"Node name for S&R": "DurationPresetControl"},
         "widgets_values": ["12 segundos"],
-        "title": "INPUT 1 · DURAÇÃO FINAL — 8 / 12 / 25 segundos",
+        "title": "INPUT 1 · DURAÇÃO ALVO — 8 / 12 / 25 segundos",
     }
 
 
@@ -122,7 +122,7 @@ def duration_switch_node():
             {
                 "name": "max_frames",
                 "type": "INT",
-                "links": [563],
+                "links": [563, 566],
                 "slot_index": 1,
             },
         ],
@@ -150,7 +150,7 @@ def main():
     workflow["id"] = "3d98378b-9f52-5bc0-98e8-c4c6f84285bf"
     workflow["revision"] = 0
     workflow["last_node_id"] = 270
-    workflow["last_link_id"] = 565
+    workflow["last_link_id"] = 566
 
     nodes = workflow["nodes"]
     template = node_by_id(workflow, 79)
@@ -161,8 +161,19 @@ def main():
     set_input_link(node_by_id(workflow, 94), "samples", 561)
     set_input_link(node_by_id(workflow, 95), "samples2", 562)
     set_input_link(node_by_id(workflow, 96), "length", 563)
-    node_by_id(workflow, 96)["title"] = "Corte máximo automático — 8 / 12 / 25 segundos"
+    node_by_id(workflow, 96)["title"] = "Corte máximo Wan — 8 / 12 / 25 segundos"
     node_by_id(workflow, 95)["title"] = "Concatena a ramificação selecionada"
+    node191 = node_by_id(workflow, 191)
+    node191["title"] = "Duração fixa — preenche o silêncio com o último frame"
+    node191["inputs"].append(
+        {
+            "localized_name": "frames-alvo",
+            "name": "target_frames",
+            "type": "INT",
+            "widget": {"name": "target_frames"},
+            "link": 566,
+        }
+    )
 
     # The 8-second preset stops after block 2; 12 seconds stops after block 3.
     add_output_link(node_by_id(workflow, 79), 0, 528)
@@ -292,6 +303,7 @@ def main():
             [561, 265, 0, 94, 0, "LATENT"],
             [562, 265, 0, 95, 1, "LATENT"],
             [563, 265, 1, 96, 2, "INT"],
+            [566, 265, 1, 191, 4, "INT"],
             [564, 270, 0, 93, 7, "INT"],
             [565, 270, 1, 93, 8, "INT"],
         ]
@@ -330,7 +342,7 @@ def main():
         95: ([5110, 80], [250, 78]),
         80: ([5110, 200], [250, 60]),
         96: ([5110, 300], [280, 100]),
-        191: ([5110, 440], [300, 150]),
+        191: ([5110, 440], [340, 180]),
         82: ([5510, 80], [310, 100]),
         113: ([5510, 220], [620, 600]),
         188: ([770, 1110], [1060, 280]),
@@ -348,7 +360,8 @@ def main():
     node_by_id(workflow, 188)["widgets_values"] = [
         "COMECE PELO BOX 1: escolha duração e resolução; depois edite somente os prompts de fala, imagem e movimento. "
         "8 s executa os blocos 1-2; 12 s executa 1-3; 25 s executa 1-6. O seletor lazy impede que os blocos longos rodem nos presets curtos. "
-        "A fala deve caber na duração escolhida; frames excedentes são cortados automaticamente. Mantenha batch_size=1. "
+        "A fala deve caber na duração escolhida; o vídeo mantém o preset preenchendo o silêncio com o último frame. "
+        "Se a fala ultrapassar o preset, o node interrompe com uma mensagem clara. Mantenha batch_size=1. "
         "A resolução 368 x 640 é a opção segura para 16 GB; 432 x 768 usa mais VRAM."
     ]
 
@@ -444,8 +457,8 @@ def main():
         },
         {
             "id": 7,
-            "title": "7 · PÓS-PROCESSAMENTO — corte máximo e duração do áudio",
-            "bounding": [4790, 0, 650, 700],
+            "title": "7 · PÓS-PROCESSAMENTO — duração alvo e áudio",
+            "bounding": [4790, 0, 660, 700],
             "color": "#4f7280",
             "font_size": 24,
             "flags": {},

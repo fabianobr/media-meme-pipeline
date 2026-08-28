@@ -37,6 +37,11 @@ cada uma — o que foi tentado, o que falhou, o que o usuário corrigiu — est�
   escolhido não são executadas. O contrato lazy foi validado no ComfyUI com latentes vazios:
   o preset de 8 s selecionou somente o latent 64×64 da primeira ramificação.
 
+### Fixed — workflow 09 follow-up
+- O workflow `09` agora trata 8/12/25 s como duração alvo: mantém os frames da fala e
+  repete o último frame durante o silêncio restante. Uma fala que excede o preset é
+  interrompida antes da saída com orientação para escolher uma duração maior.
+
 ### Changed
 - Defaults do render LTX 2.3 trocados para a receita validada pelo usuário (2026-07-21):
   `--ltx23-input-mode prompt` (T2V a partir de descrição de cena literal, sem imagem de
