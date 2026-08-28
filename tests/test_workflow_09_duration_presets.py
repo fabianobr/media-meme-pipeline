@@ -201,6 +201,15 @@ def test_fixed_duration_fills_silence_and_rejects_overlong_speech():
         )
         assert fitted.shape[0] == 400
 
+        exact_audio = {
+            "waveform": FakeTensor((1, 1, 400_000)),
+            "sample_rate": 16_000,
+        }
+        (exact,) = module.TrimImageSequenceToAudio().trim(
+            images, exact_audio, fps=16.0, end_padding_frames=2, target_frames=400
+        )
+        assert exact.shape[0] == 400
+
         long_audio = {
             "waveform": FakeTensor((1, 1, 416_000)),
             "sample_rate": 16_000,

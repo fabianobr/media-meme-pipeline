@@ -178,14 +178,15 @@ class TrimImageSequenceToAudio:
             raise ValueError("O áudio precisa conter amostras e sample_rate válido.")
 
         duration_seconds = waveform.shape[-1] / sample_rate
-        speech_frames = max(1, round(duration_seconds * fps) + end_padding_frames)
+        audio_frames = max(1, round(duration_seconds * fps))
+        speech_frames = audio_frames + end_padding_frames
 
         if target_frames is None or int(target_frames) <= 0:
             wanted_frames = min(int(images.shape[0]), speech_frames)
             return (images[: max(1, wanted_frames)],)
 
         target_frames = int(target_frames)
-        if speech_frames > target_frames:
+        if audio_frames > target_frames:
             raise ValueError(
                 f"A fala ocupa aproximadamente {duration_seconds:.2f} s, acima do "
                 f"preset de {target_frames / fps:.2f} s. Escolha uma duração maior "
