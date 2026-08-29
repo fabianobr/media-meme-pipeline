@@ -11,7 +11,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 spec="${VIDEO_SPEC:-$here/specs/video-spec.json}"
-whisper_model="${WHISPER_MODEL:-base}"
+whisper_model="${WHISPER_MODEL:-small}"  # 'small' is the floor for reliable pt-BR language ID + transcription
 
 file="" ; target_seconds="" ; prompt_file=""
 while [[ $# -gt 0 ]]; do

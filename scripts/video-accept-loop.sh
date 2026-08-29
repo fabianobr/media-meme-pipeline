@@ -93,11 +93,23 @@ for ((i = 1; i <= max_iter; i++)); do
   printf '%s\n' "$negative" > "$nf"
 
   echo "== iteration $i"
-  if ! "$here/scripts/lint-prompt.sh" "$pf" "$sf"; then
-    echo "  prompt failed lint; mutating without spending a render"
-    mutate "prompt_realism_not_cartoon" || { echo "iter $i: lint dead-end" ; break ; }
-    echo -e "$i\tLINT_FAIL\tprompt" >> "$trend"
-    continue
+  lint_rc=0
+  lint_out="$("$here/scripts/lint-prompt.sh" "$pf" "$sf" 2>&1)" || lint_rc=$?
+  echo "$lint_out"
+  if (( lint_rc != 0 )); then
+    if grep -qi 'spanish cue' <<<"$lint_out"; then
+      echo "  lint: Spanish cue in the prompt or spoken line -- the loop cannot rewrite wording; flagging for human"
+      echo -e "$i\tLINT_FAIL\tspanish" >> "$trend"
+      break
+    elif grep -qiE 'style keyword|realism keyword' <<<"$lint_out"; then
+      echo -e "$i\tLINT_FAIL\tstyle" >> "$trend"
+      mutate "prompt_realism_not_cartoon" || { echo "iter $i: lint dead-end"; break; }
+      continue
+    else
+      echo "  lint: unrecognized failure; flagging for human"
+      echo -e "$i\tLINT_FAIL\tother" >> "$trend"
+      break
+    fi
   fi
 
   cmd="${render_cmd//\{prompt_file\}/$pf}"
@@ -140,6 +152,6 @@ done
 
 echo "== no passing candidate in $max_iter iteration(s)"
 echo "-- grade trend --"
-column -t -s $'\t' "$trend"
+awk -F'\t' '{ printf "%-6s %-14s %s\n", $1, $2, $3 }' "$trend"
 echo "-- best iteration: ${best_iter:-none} ($best_fail_count failing rule(s)) --"
 exit 1
