@@ -30,9 +30,13 @@ for bin in ffprobe ffmpeg jq python3; do command -v "$bin" >/dev/null || { echo 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# --- 1. duration -----------------------------------------------------------
+# --- 1. duration + audio stream ------------------------------------------
 duration="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$file" | head -n1)"
 [[ -n "$duration" ]] || { echo "ffprobe found no duration" >&2; exit 2; }
+has_audio=0
+if ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$file" | grep -q .; then
+  has_audio=1
+fi
 
 # --- 2. silence (ffmpeg silencedetect) -----------------------------------
 noise_db="$(jq -r '.audio.silencedetect_noise_db' "$spec")"
@@ -54,7 +58,7 @@ asr_json="$tmp/$(basename "${file%.*}").json"
 [[ $asr_ok -eq 1 && -r "$asr_json" ]] || asr_json=""
 
 # --- 4. assemble verdict (python does the arithmetic) -------------------
-SPEC="$spec" FILE="$file" DURATION="$duration" TARGET="$target_seconds" \
+SPEC="$spec" FILE="$file" DURATION="$duration" TARGET="$target_seconds" HAS_AUDIO="$has_audio" \
 GAPS="$tmp/gaps.txt" ASR_JSON="$asr_json" PROMPT_FILE="$prompt_file" \
 python3 - <<'PY'
 import json, os, re, sys
@@ -72,10 +76,16 @@ def rule(name, value, threshold, ok):
     rules[name] = {"value": round(value, 4) if isinstance(value, float) else value,
                    "threshold": threshold, "pass": bool(ok)}
 
-rule("max_silent_gap_seconds", max_gap, audio["max_silent_gap_seconds"],
-     max_gap <= audio["max_silent_gap_seconds"])
-rule("speech_to_total_ratio", speech_ratio, audio["min_speech_to_total_ratio"],
-     speech_ratio >= audio["min_speech_to_total_ratio"])
+has_audio = os.environ.get("HAS_AUDIO") == "1"
+if not has_audio:
+    # A mute render must not pass audio rules by virtue of having no sound.
+    rule("max_silent_gap_seconds", "no audio track", audio["max_silent_gap_seconds"], False)
+    rule("speech_to_total_ratio", 0.0, audio["min_speech_to_total_ratio"], False)
+else:
+    rule("max_silent_gap_seconds", max_gap, audio["max_silent_gap_seconds"],
+         max_gap <= audio["max_silent_gap_seconds"])
+    rule("speech_to_total_ratio", speech_ratio, audio["min_speech_to_total_ratio"],
+         speech_ratio >= audio["min_speech_to_total_ratio"])
 
 target = os.environ.get("TARGET") or ""
 if target:
@@ -93,7 +103,11 @@ if asr:
     lang = data.get("language", "")
     text = (data.get("text") or "").lower()
     want_lang = spec["target_language"].split("-")[0].lower()  # 'pt-BR' -> 'pt'
-    rule("spoken_language", lang, spec["target_language"], lang.lower() == want_lang)
+    if not text.strip():
+        rule("spoken_language", lang or None, spec["target_language"], False)
+        rules["spoken_language"]["reason"] = "no speech detected in audio"
+    else:
+        rule("spoken_language", lang, spec["target_language"], lang.lower() == want_lang)
 
     forbidden = []
     for group, toks in spec["forbidden_prompt_tokens"].items():

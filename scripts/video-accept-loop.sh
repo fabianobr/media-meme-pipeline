@@ -62,7 +62,11 @@ mutate() {
       echo "  mutation: duration off-target is a render-parameter fix, not a prompt fix -- flagging for human"
       return 1
       ;;
-    prompt_realism_not_cartoon|spoken_language|no_spanish_in_speech)
+    spoken_language)
+      echo "  mutation: spoken language is wrong -- a TTS voice / spoken-text problem the loop cannot fix mechanically; flagging for human"
+      return 1
+      ;;
+    prompt_realism_not_cartoon|no_spanish_in_speech)
       visual="photorealistic, live-action, natural light, $visual"
       negative="cartoon, anime, illustration, cgi, 3d render, stylized, spanish accent, ${negative}"
       echo "  mutation: strengthened realism keywords + pushed style/Spanish cues to negative"
@@ -74,8 +78,11 @@ mutate() {
   esac
 }
 
-default_render_cmd='python3 '"$here"'/scripts/daily_reddit_meme_pipeline.py --help >/dev/null; echo "NO --render-cmd given: wire this to your render entrypoint" >&2; exit 3'
-[[ -n "$render_cmd" ]] || render_cmd="$default_render_cmd"
+if [[ -z "$render_cmd" ]]; then
+  echo "error: --render-cmd is required (template with {prompt_file} {spoken_file} {negative_file} {target_seconds} {out_mp4})." >&2
+  echo "       wire it to your render entrypoint, e.g. the checked-in pipeline or a wrapper." >&2
+  exit 2
+fi
 
 best_iter="" ; best_fail_count=999
 for ((i = 1; i <= max_iter; i++)); do
@@ -86,7 +93,7 @@ for ((i = 1; i <= max_iter; i++)); do
   printf '%s\n' "$negative" > "$nf"
 
   echo "== iteration $i"
-  if ! "$here/scripts/lint-prompt.sh" "$pf"; then
+  if ! "$here/scripts/lint-prompt.sh" "$pf" "$sf"; then
     echo "  prompt failed lint; mutating without spending a render"
     mutate "prompt_realism_not_cartoon" || { echo "iter $i: lint dead-end" ; break ; }
     echo -e "$i\tLINT_FAIL\tprompt" >> "$trend"

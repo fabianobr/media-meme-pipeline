@@ -16,7 +16,7 @@ enforces the prompt-only rules before a render is ever submitted.
 - **No Spanish-language cue anywhere in the prompt** (word-boundary, case-insensitive):
   - _spanish articles_: `el`, `un`, `los`, `las`, `una`, `unos`, `unas`, `del`, `al`
   - _spanish orthography_: `ción`, `cción`, `ñ`, `¿`, `¡`
-  - _spanish words_: `muy`, `mucha`, `mucho`, `pero`, `con`, `sin`, `perro`, `niño`, `niña`, `está`, `están`, `estás`, `hombre`, `mujer`, `gato negro`, `casa blanca`, `ahora`, `siempre`, `también`, `porque`, `entonces`, `hacia`
+  - _spanish words_: `muy`, `mucha`, `mucho`, `pero`, `con`, `sin`, `perro`, `niño`, `niña`, `están`, `hombre`, `mujer`, `gato negro`, `casa blanca`, `ahora`, `siempre`, `también`, `entonces`, `hacia`
   - _spanish phonetic hints_: `lluvia`, `calle`, `ustedes`, `vosotros`
 
 ## Grading workflow (every render)

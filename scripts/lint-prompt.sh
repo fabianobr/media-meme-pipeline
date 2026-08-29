@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-# Scan a prompt file for anything specs/video-spec.json forbids, BEFORE rendering.
-# Never waste a render on a leftover Spanish cue or a cartoon style keyword.
+# Scan prompt text for anything specs/video-spec.json forbids, BEFORE rendering.
+# Pass every string that reaches the model -- the visual prompt AND the spoken
+# line -- so a leftover Spanish cue or a cartoon keyword never costs a render.
 #
-#   scripts/lint-prompt.sh path/to/prompt.txt
+#   scripts/lint-prompt.sh visual-prompt.txt [spoken.txt ...]
 #
-# Exit 0 = clean. Exit 1 = violations (printed). Exit 2 = usage/tооling error.
+# Exit 0 = clean. Exit 1 = violations (printed). Exit 2 = usage/tooling error.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 spec="${VIDEO_SPEC:-$here/specs/video-spec.json}"
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <prompt-file>" >&2
+if [[ $# -lt 1 ]]; then
+  echo "usage: $0 <prompt-file> [more-files ...]" >&2
   exit 2
 fi
-prompt_file="$1"
-[[ -r "$prompt_file" ]] || { echo "cannot read prompt file: $prompt_file" >&2; exit 2; }
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 2; }
 [[ -r "$spec" ]] || { echo "cannot read spec: $spec" >&2; exit 2; }
 
-# Lowercased prompt text for case-insensitive matching.
-text="$(tr '[:upper:]' '[:lower:]' < "$prompt_file")"
+# Lowercased concatenation of every input file, for case-insensitive matching.
+text=""
+for f in "$@"; do
+  [[ -r "$f" ]] || { echo "cannot read prompt file: $f" >&2; exit 2; }
+  text+="$(tr '[:upper:]' '[:lower:]' < "$f")"$'\n'
+done
+prompt_file="$*"
 violations=0
 
 # word-boundary grep for a single needle; returns 0 if found

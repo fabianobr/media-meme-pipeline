@@ -42,7 +42,7 @@
     ]
   },
   "forbidden_prompt_tokens": {
-    "$comment": "pt-BR and es overlap heavily; this list is deliberately high-precision (es-only forms unlikely to be intended pt-BR). Word-boundary, case-insensitive match. Extend freely.",
+    "$comment": "pt-BR and es overlap heavily; this list is deliberately high-precision (es-only forms unlikely to be intended pt-BR). Word-boundary, case-insensitive match. Extend freely, but do NOT add pt-BR homographs: 'porque', 'esta', 'esta', 'estas', 'como', 'sobre', 'ele' are valid Portuguese.",
     "spanish_articles": ["el", "un", "los", "las", "una", "unos", "unas", "del", "al"],
     "spanish_orthography": ["ción", "cción", "ñ", "¿", "¡"],
     "spanish_words": [
@@ -55,9 +55,7 @@
       "perro",
       "niño",
       "niña",
-      "está",
       "están",
-      "estás",
       "hombre",
       "mujer",
       "gato negro",
@@ -65,7 +63,6 @@
       "ahora",
       "siempre",
       "también",
-      "porque",
       "entonces",
       "hacia"
     ],
