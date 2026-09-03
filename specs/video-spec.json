@@ -1,0 +1,71 @@
+{
+  "$comment": "Machine-checkable acceptance requirements for generated meme/reel videos. SOURCE OF TRUTH. docs/video-acceptance.md is generated from this file by scripts/gen_video_acceptance_doc.py -- edit here, then regenerate.",
+  "version": 1,
+  "target_language": "pt-BR",
+  "tts_engine": "edge-tts",
+  "max_tts_chars_per_chunk": 240,
+  "audio": {
+    "max_silent_gap_seconds": 1.5,
+    "min_speech_to_total_ratio": 0.55,
+    "silencedetect_noise_db": -30,
+    "silencedetect_min_duration_seconds": 0.3
+  },
+  "duration": {
+    "tolerance_pct": 10
+  },
+  "style": {
+    "required_realism_keywords": [
+      "photorealistic",
+      "realistic",
+      "natural light",
+      "live-action",
+      "cinematic"
+    ],
+    "required_realism_keyword_min_hits": 1,
+    "forbidden_style_keywords": [
+      "cartoon",
+      "anime",
+      "illustration",
+      "illustrated",
+      "cgi",
+      "3d render",
+      "3d-render",
+      "drawing",
+      "sketch",
+      "stylized",
+      "comic",
+      "pixar",
+      "disney",
+      "claymation",
+      "low poly",
+      "vector art"
+    ]
+  },
+  "forbidden_prompt_tokens": {
+    "$comment": "pt-BR and es overlap heavily; this list is deliberately high-precision (es-only forms unlikely to be intended pt-BR). Word-boundary, case-insensitive match. Extend freely, but do NOT add pt-BR homographs: 'porque', 'esta', 'esta', 'estas', 'como', 'sobre', 'ele' are valid Portuguese.",
+    "spanish_articles": ["el", "un", "los", "las", "una", "unos", "unas", "del", "al"],
+    "spanish_orthography": ["ción", "cción", "ñ", "¿", "¡"],
+    "spanish_words": [
+      "muy",
+      "mucha",
+      "mucho",
+      "pero",
+      "con",
+      "sin",
+      "perro",
+      "niño",
+      "niña",
+      "están",
+      "hombre",
+      "mujer",
+      "gato negro",
+      "casa blanca",
+      "ahora",
+      "siempre",
+      "también",
+      "entonces",
+      "hacia"
+    ],
+    "spanish_phonetic_hints": ["lluvia", "calle", "ustedes", "vosotros"]
+  }
+}
